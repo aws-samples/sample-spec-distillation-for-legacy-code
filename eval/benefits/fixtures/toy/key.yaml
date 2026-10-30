@@ -1,0 +1,46 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Toy answer key (synthetic-corpus format) for eval/benefits self-tests.
+items:
+  - id: T-01
+    type: validation
+    statement: SubmitInvoice rejects an invoice with more than MAX_LINES = 25 lines (ERR_TOO_MANY_LINES); the comment claiming a max of 10 lines is wrong.
+    locations: [{file: InvoiceService.vb, start_line: 7, end_line: 8}, {file: InvoiceService.vb, start_line: 16, end_line: 16}]
+    evidence_class: code
+    flags: [comment_only, inconsistency]
+  - id: T-02
+    type: calculation
+    statement: Invoice total is computed in two places with different tax multipliers and rounding (SubmitInvoice uses 1.08 with default banker's rounding; RecalculateTotal uses 1.07 with AwayFromZero), so totals can disagree.
+    locations: [{file: InvoiceService.vb, start_line: 19, end_line: 21}, {file: InvoiceService.vb, start_line: 34, end_line: 36}]
+    evidence_class: code
+    flags: [duplicated_logic, inconsistency]
+  - id: T-03
+    type: workflow
+    statement: Vendors whose code starts with "ZZ" are auto-approved (status APPROVED) and skip the approval step; this bypass is undocumented.
+    locations: [{file: InvoiceService.vb, start_line: 24, end_line: 27}]
+    evidence_class: code
+    flags: [undocumented_feature]
+  - id: T-04
+    type: workflow
+    statement: usp_SaveInvoice downgrades an APPROVED invoice with total over 50000 back to PENDING_APPROVAL, so ZZ auto-approval only holds up to 50000.
+    locations: [{file: schema.sql, start_line: 20, end_line: 21}]
+    evidence_class: db
+    flags: [db_only]
+  - id: T-05
+    type: validation
+    statement: The database requires invoice Total > 0 and (VendorCode, InvoiceNo) unique; the application does not check either, so a zero-total or duplicate invoice fails only at insert.
+    locations: [{file: schema.sql, start_line: 8, end_line: 8}, {file: schema.sql, start_line: 11, end_line: 11}]
+    evidence_class: db
+    flags: [db_only]
+  - id: T-06
+    type: calculation
+    statement: IsOverdue uses Days > 30, so an invoice exactly 30 days past due is not overdue (off-by-one against a 30-day policy).
+    locations: [{file: InvoiceService.vb, start_line: 40, end_line: 42}]
+    evidence_class: code
+    flags: [logic_flaw]
+  - id: T-07
+    type: calculation
+    statement: LegacyDiscount (2% discount) is private and never called (dead code).
+    locations: [{file: InvoiceService.vb, start_line: 44, end_line: 46}]
+    evidence_class: code
+    flags: [dead_code]

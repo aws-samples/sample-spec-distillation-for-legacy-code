@@ -1,0 +1,76 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Generic deterministic suite: the Quick check for ANY finished run, including code that has no
+# answer key. No Bedrock calls in any mode. The launcher falls back to it for a smoke check when no
+# other suite matches the run, and passes the run's own source:
+#
+#   python3 eval/ci/run_suite.py --config eval/ci/suites/generic.yaml --smoke \
+#     --var run=<run dir> --var source_root=<the analysed source> --out <dir>
+#
+# score.py runs against an EMPTY key (eval/keys/_none/EMPTY_KEY.yaml), so only its
+# key-independent layers mean anything here: citation validity, source-line coverage and spec
+# structure. Recall and precision need an answer key: build a test data set for the run first.
+
+suite: generic
+schema_version: 1
+description: >-
+  Deterministic checks for any run, with no answer key: source sanity, knowledge-graph structure
+  and parity with the code parser, and the spec's citation validity, coverage and structure.
+
+vars:
+  source_root: .
+  repo_root: ${source_root}
+  run: output/run
+  key: eval/keys/_none/EMPTY_KEY.yaml
+
+budget_usd: 0.0
+judge_runs: 1
+
+corpora:
+  generic:
+    source_root: ${source_root}
+    key: ${key}
+    exclude: []
+
+stages:
+  - id: corpus-sanity
+    evaluator: sanity
+    path: ${source_root}
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  - id: graph-eval
+    evaluator: graph_eval
+    corpus: generic
+    # "<run>/knowledge_graph/.." is the run directory, but it only exists when the run built a
+    # knowledge graph, so a run without one gets this stage skipped (optional), not failed
+    run_dir: ${run}/knowledge_graph/..
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  - id: score-master-blend
+    evaluator: score
+    corpus: generic
+    spec: ${run}/master_blend/master_blend.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  - id: score-bottled
+    evaluator: score
+    corpus: generic
+    spec: ${run}/bottled_spec/bottled_spec.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+thresholds: []

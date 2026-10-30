@@ -1,0 +1,47 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# GOLDEN CALIBRATION TEMPLATE
+#
+# Purpose: measure the LLM judge's error instead of assuming it. A human reads a
+# specific spec against the source and records, for a subset of answer-key items,
+# whether that spec covers the item. score.py --golden <this file> then reports
+# judge-vs-human agreement and Cohen's kappa over the labelled subset.
+#
+# A golden file is tied to ONE spec. If the spec is regenerated, the labels must
+# be re-checked; set `spec_sha256` so a stale pairing is noticeable.
+#
+# How to label (keep this rule, so different labellers agree with each other):
+#   full    - the spec's essential operative claim for this key item is
+#             recoverable from the requirement text WITHOUT adding information
+#             the spec does not contain.
+#   partial - the spec touches the item but blurs, hedges, splits or contradicts
+#             its essential claim; or it states only part of a two-part claim.
+#   missed  - nothing in the spec addresses the item.
+#
+# Record `basis` for every row: which spec requirement ids you read, which source
+# lines you checked, and why you chose that label. A label with no basis is not
+# evidence; `test_cli.py::test_shipped_golden_file_loads` enforces this.
+#
+# Aim for 12-20 items and bias the selection toward:
+#   - the key's trap/flagged items (where judges are least reliable), and
+#   - items you expect to be missed (so the subset is not all one label).
+
+spec: relative/or/absolute/path/to/spec.md
+spec_sha256: null            # optional; sha256 of the spec file when labelled
+key: relative/path/to/ANSWER_KEY.yaml
+corpus: name-of-corpus
+labelled_by: your-alias
+labelled_on: YYYY-MM-DD
+method: >-
+  One or two sentences: what you read, in what order, and what rule you applied
+  for full vs partial vs missed.
+
+key_items:
+  - id: BR-001
+    expected_coverage: full        # full | partial | missed
+    spec_requirements: [RL-0001, EX-0002]
+    source_checked: ["Scripts/StoredProcedures/usp_X.sql:10-20"]
+    basis: >-
+      Why this label. Name the sentence in the spec that carries the claim, or
+      say what is absent.

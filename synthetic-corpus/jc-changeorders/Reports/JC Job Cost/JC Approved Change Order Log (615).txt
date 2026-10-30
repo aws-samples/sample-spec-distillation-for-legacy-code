@@ -1,0 +1,48 @@
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+
+REPORT DEFINITION EXPORT  (stand-in for JC Approved Change Order Log.rpt)
+=====================================================================
+Report #      : 615
+Title         : JC Approved Change Order Log
+Module        : JC
+Data source   : Command  -> Scripts\Reports\615.sql
+Last modified : TKB 02/2016
+
+PARAMETERS
+  {?JCCo}         Number    JC company
+  {?Job}          String    blank = all jobs
+  {?FromDate}     Date      approval date from
+  {?ToDate}       Date      approval date to (default CurrentDate)
+  {?COType}       String    O / S / I, blank = all
+
+GROUPS
+  GH1  Command.Job          "Job: " + {Command.Job} + " - " + {Command.JobDescr}
+  GH2  Command.COType       @TypeText
+
+DETAIL
+  CONum | Description | Reason | ApprBy | ApprDate | CostAmt | @MarkupEarned | TaxAmt | @LineTotal | DaysExt | ExecReq
+
+FORMULA FIELDS
+  @TypeText       Select {Command.COType}
+                    Case "O": "Owner Change Orders"
+                    Case "S": "Subcontract Change Orders"
+                    Case "I": "Internal Change Orders"
+                    Default: {Command.COType}
+  @MarkupEarned   Round({Command.CostAmt} * {Command.MarkupPct} / 100, 2)
+  @LineTotal      {Command.CostAmt} + @MarkupEarned + {Command.TaxAmt}
+  @ExecFlag       If {Command.ExecReq} = "Y" Then "*" Else ""
+  @AutoFlag       If {Command.AutoAppr} = "Y" Then "(auto)" Else ""
+
+SUMMARIES
+  GF2  Sum(CostAmt), Sum(@MarkupEarned), Sum(TaxAmt), Sum(@LineTotal), Sum(DaysExt)
+  GF1  Sum(@LineTotal)                     "Total approved changes"
+       {Command.OrigContract}              "Original contract"
+       {Command.RevContract}               "Revised contract"
+  RF   Sum(@LineTotal)                     "Grand total"
+
+PAGE FOOTER
+  "* = over executive approval threshold"
+  "Printed " + ToText(CurrentDateTime) + "  Report 615"
+
+NOTES
+  Owner COs only change the revised contract once they are posted (status I).

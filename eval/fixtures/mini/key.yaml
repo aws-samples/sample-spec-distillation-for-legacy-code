@@ -1,0 +1,24 @@
+system: mini
+items:
+  - id: R1
+    type: rule
+    core: true
+    statement: Unit price is fixed at 12.50.
+    citations: [calc.cob:6]
+    evidence: Verified
+  - id: R2
+    type: rule
+    core: true
+    statement: Quantities above 100 are rejected with the message "Quantity too large".
+    citations: [calc.cob:10-11]
+    evidence: Verified
+  - id: R3
+    type: rule
+    statement: The total is quantity multiplied by unit price and is displayed.
+    citations: [calc.cob:13-14]
+    evidence: Verified
+  - id: D1
+    type: data
+    statement: Quantity is an unsigned 3-digit number PIC 9(3).
+    citations: [calc.cob:5]
+    evidence: Verified

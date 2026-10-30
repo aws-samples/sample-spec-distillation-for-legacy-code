@@ -1,0 +1,5 @@
+persistent_objects.md
+business_invariants.md
+data_obligations.md
+data_boundaries.md
+README.md

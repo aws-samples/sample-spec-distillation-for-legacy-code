@@ -1,0 +1,4 @@
+{"ts": "2026-10-05T17:22:08.613053+00:00", "tag": "benefits:spec:qa", "model": "us.anthropic.claude-sonnet-4-6", "input_tokens": 1702, "output_tokens": 296, "cost_usd": 0.009546, "latency_s": 4.22, "stop_reason": "end_turn"}
+{"ts": "2026-10-05T17:22:13.689802+00:00", "tag": "benefits:spec:qa", "model": "us.anthropic.claude-sonnet-4-6", "input_tokens": 1701, "output_tokens": 394, "cost_usd": 0.011013, "latency_s": 5.07, "stop_reason": "end_turn"}
+{"ts": "2026-10-05T17:22:16.512781+00:00", "tag": "benefits:spec:qa", "model": "us.anthropic.claude-sonnet-4-6", "input_tokens": 1687, "output_tokens": 247, "cost_usd": 0.008766, "latency_s": 2.82, "stop_reason": "end_turn"}
+{"ts": "2026-10-05T17:22:21.060509+00:00", "tag": "benefits:qa:judge", "model": "us.anthropic.claude-sonnet-4-6", "input_tokens": 1953, "output_tokens": 340, "cost_usd": 0.010959, "latency_s": 4.55, "stop_reason": "end_turn"}

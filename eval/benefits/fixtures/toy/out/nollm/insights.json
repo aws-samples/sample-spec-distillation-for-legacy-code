@@ -1,0 +1,454 @@
+{
+  "benefit": "B1 modernization insight",
+  "script": "insights",
+  "tool": "raw-code-nollm",
+  "spec": "eval/benefits/fixtures/toy/out/raw-code/insights_spec.md",
+  "key": "eval/benefits/fixtures/toy/key.yaml",
+  "method": "deterministic",
+  "flag_classifier": "keywords",
+  "generation": null,
+  "summary": {
+    "key_items": 7,
+    "findings": 17,
+    "issue_items": 5,
+    "issue_described_any_pct": 100.0,
+    "issue_flagged_same_pct": 100.0,
+    "issue_flagged_any_pct": 100.0,
+    "findings_flagging_issues": 13,
+    "flag_precision_keyed_pct": 53.8,
+    "flag_precision_true_pct": null,
+    "overall_recall_full_pct": 100.0,
+    "overall_recall_any_pct": 100.0,
+    "incorrect_findings": 0,
+    "duplicated_logic_described_pct": 100.0,
+    "duplicated_logic_flagged_pct": 100.0,
+    "logic_flaw_described_pct": 100.0,
+    "logic_flaw_flagged_pct": 100.0,
+    "undocumented_feature_described_pct": 100.0,
+    "undocumented_feature_flagged_pct": 100.0,
+    "inconsistency_described_pct": 100.0,
+    "inconsistency_flagged_pct": 100.0,
+    "dead_code_described_pct": 100.0,
+    "dead_code_flagged_pct": 100.0,
+    "comment_only_described_pct": 100.0,
+    "db_only_described_pct": 100.0
+  },
+  "per_flag": {
+    "duplicated_logic": {
+      "items": 1,
+      "described_full": 1,
+      "described_any": 1,
+      "flagged_same": 1,
+      "flagged_any_issue": 1,
+      "findings_flagging": 2,
+      "flag_keyed_tp": 1,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": 100.0,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": 50.0,
+      "flag_precision_true_pct": null
+    },
+    "logic_flaw": {
+      "items": 1,
+      "described_full": 1,
+      "described_any": 1,
+      "flagged_same": 1,
+      "flagged_any_issue": 1,
+      "findings_flagging": 4,
+      "flag_keyed_tp": 1,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": 100.0,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": 25.0,
+      "flag_precision_true_pct": null
+    },
+    "undocumented_feature": {
+      "items": 1,
+      "described_full": 1,
+      "described_any": 1,
+      "flagged_same": 1,
+      "flagged_any_issue": 1,
+      "findings_flagging": 4,
+      "flag_keyed_tp": 1,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": 100.0,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": 25.0,
+      "flag_precision_true_pct": null
+    },
+    "inconsistency": {
+      "items": 2,
+      "described_full": 2,
+      "described_any": 2,
+      "flagged_same": 2,
+      "flagged_any_issue": 2,
+      "findings_flagging": 6,
+      "flag_keyed_tp": 4,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": 100.0,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": 66.7,
+      "flag_precision_true_pct": null
+    },
+    "dead_code": {
+      "items": 1,
+      "described_full": 1,
+      "described_any": 1,
+      "flagged_same": 1,
+      "flagged_any_issue": 1,
+      "findings_flagging": 1,
+      "flag_keyed_tp": 1,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": 100.0,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": 100.0,
+      "flag_precision_true_pct": null
+    },
+    "comment_only": {
+      "items": 1,
+      "described_full": 1,
+      "described_any": 1,
+      "flagged_same": null,
+      "flagged_any_issue": 1,
+      "findings_flagging": null,
+      "flag_keyed_tp": null,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": null,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": null,
+      "flag_precision_true_pct": null
+    },
+    "db_only": {
+      "items": 2,
+      "described_full": 2,
+      "described_any": 2,
+      "flagged_same": null,
+      "flagged_any_issue": 2,
+      "findings_flagging": null,
+      "flag_keyed_tp": null,
+      "flag_true_tp": null,
+      "described_recall_full_pct": 100.0,
+      "described_recall_any_pct": 100.0,
+      "flagged_recall_pct": null,
+      "flagged_any_issue_recall_pct": 100.0,
+      "flag_precision_keyed_pct": null,
+      "flag_precision_true_pct": null
+    }
+  },
+  "items": [
+    {
+      "id": "T-01",
+      "flags": [
+        "comment_only",
+        "inconsistency"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "inconsistency"
+      ],
+      "statement": "SubmitInvoice rejects an invoice with more than MAX_LINES = 25 lines (ERR_TOO_MANY_LINES); the comment claiming a max of 10 lines is wrong."
+    },
+    {
+      "id": "T-02",
+      "flags": [
+        "duplicated_logic",
+        "inconsistency"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "duplicated_logic",
+        "inconsistency"
+      ],
+      "statement": "Invoice total is computed in two places with different tax multipliers and rounding (SubmitInvoice uses 1.08 with default banker's rounding; RecalculateTotal uses 1.07 with AwayFromZero), so totals can disagree."
+    },
+    {
+      "id": "T-03",
+      "flags": [
+        "undocumented_feature"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "undocumented_feature"
+      ],
+      "statement": "Vendors whose code starts with \"ZZ\" are auto-approved (status APPROVED) and skip the approval step; this bypass is undocumented."
+    },
+    {
+      "id": "T-04",
+      "flags": [
+        "db_only"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "inconsistency",
+        "logic_flaw",
+        "undocumented_feature"
+      ],
+      "statement": "usp_SaveInvoice downgrades an APPROVED invoice with total over 50000 back to PENDING_APPROVAL, so ZZ auto-approval only holds up to 50000."
+    },
+    {
+      "id": "T-05",
+      "flags": [
+        "db_only"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "duplicated_logic",
+        "logic_flaw"
+      ],
+      "statement": "The database requires invoice Total > 0 and (VendorCode, InvoiceNo) unique; the application does not check either, so a zero-total or duplicate invoice fails only at insert."
+    },
+    {
+      "id": "T-06",
+      "flags": [
+        "logic_flaw"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "logic_flaw"
+      ],
+      "statement": "IsOverdue uses Days > 30, so an invoice exactly 30 days past due is not overdue (off-by-one against a 30-day policy)."
+    },
+    {
+      "id": "T-07",
+      "flags": [
+        "dead_code"
+      ],
+      "coverage": "full",
+      "flagged_as": [
+        "dead_code"
+      ],
+      "statement": "LegacyDiscount (2% discount) is private and never called (dead code)."
+    }
+  ],
+  "budget": {
+    "calls": 0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "cost_usd": 0.0,
+    "max_usd": 1.0,
+    "stopped": null
+  },
+  "findings": [
+    {
+      "id": "F1",
+      "text": "- Business rule: An invoice must have a non-empty vendor code. (InvoiceService.vb:L13-L13)",
+      "flags_raised": [],
+      "matches": [],
+      "verdict": "unmatched"
+    },
+    {
+      "id": "F2",
+      "text": "- Business rule: An invoice must have a non-empty invoice number. (InvoiceService.vb:L14-L14)",
+      "flags_raised": [],
+      "matches": [],
+      "verdict": "unmatched"
+    },
+    {
+      "id": "F3",
+      "text": "- Business rule: An invoice must have at least one line item. (InvoiceService.vb:L15-L15)",
+      "flags_raised": [],
+      "matches": [],
+      "verdict": "unmatched"
+    },
+    {
+      "id": "F4",
+      "text": "- [ISSUE: inconsistency] Business rule: An invoice may not exceed MAX_LINES (25) line items. The comment on line 7 says 'Max 10 lines per invoice' but the constant is set to 25 \u2014 these are inconsistent. (InvoiceService.vb:L7-L8)",
+      "flags_raised": [
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-01",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F5",
+      "text": "- [ISSUE: inconsistency] Business rule: The tax rate applied to each line when computing the invoice total in SubmitInvoice is 8% (multiplier 1.08). However, RecalculateTotal uses a 7% tax rate (multiplier 1.07). These two methods produce different totals for the same lines \u2014 the rewrite team must decide which rate is correct. (InvoiceService.vb:L20-L20; InvoiceService.vb:L35-L35)",
+      "flags_raised": [
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-02",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F6",
+      "text": "- [ISSUE: inconsistency] Business rule: RecalculateTotal uses MidpointRounding.AwayFromZero explicitly, while SubmitInvoice uses Math.Round with default (banker's) rounding. This means the two totals can differ even if the tax rate were the same. (InvoiceService.vb:L20-L20; InvoiceService.vb:L35-L35)",
+      "flags_raised": [
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-02",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F7",
+      "text": "- Business rule: The invoice total (as computed in SubmitInvoice) must not exceed MAX_AMOUNT (100,000). The rewrite must clarify whether this cap applies to the pre-tax or post-tax total, and which tax rate is authoritative. (InvoiceService.vb:L22-L22)",
+      "flags_raised": [],
+      "matches": [
+        {
+          "key_id": "T-02",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F8",
+      "text": "- [ISSUE: undocumented_feature] Business rule: Invoices from vendors whose code starts with 'ZZ' are automatically set to APPROVED status; all others are set to PENDING_APPROVAL. This special-vendor rule is undocumented \u2014 no comment explains the business meaning of the 'ZZ' prefix. (InvoiceService.vb:L24-L27)",
+      "flags_raised": [
+        "undocumented_feature"
+      ],
+      "matches": [
+        {
+          "key_id": "T-03",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F9",
+      "text": "- [ISSUE: undocumented_feature] Business rule (in database): The stored procedure overrides APPROVED status back to PENDING_APPROVAL when the total exceeds 50,000. This rule exists only in the database and is invisible to the VB application layer \u2014 the application may return 'APPROVED' to the caller while the database silently stores 'PENDING_APPROVAL', creating a discrepancy between the returned value and the persisted value. (schema.sql:L20-L21; InvoiceService.vb:L28-L29)",
+      "flags_raised": [
+        "undocumented_feature",
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-04",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F10",
+      "text": "- [ISSUE: logic_flaw] Logic flaw: The application-level MAX_AMOUNT cap is 100,000, but the database silently demotes APPROVED invoices above 50,000 to PENDING_APPROVAL. The two thresholds are inconsistent and the application is unaware of the database override, so the return value of SubmitInvoice can be wrong for ZZ-vendor invoices between 50,001 and 100,000. (InvoiceService.vb:L9-L9; InvoiceService.vb:L22-L22; schema.sql:L20-L21)",
+      "flags_raised": [
+        "logic_flaw",
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-04",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F11",
+      "text": "- [ISSUE: logic_flaw] Business rule: The database enforces a unique constraint on (VendorCode, InvoiceNo). The application does not check for duplicates before calling SaveInvoice, so duplicate submissions will throw an unhandled SQL exception rather than returning a structured error code. (schema.sql:L11-L11; InvoiceService.vb:L48-L59)",
+      "flags_raised": [
+        "duplicated_logic",
+        "logic_flaw"
+      ],
+      "matches": [
+        {
+          "key_id": "T-05",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F12",
+      "text": "- [ISSUE: logic_flaw] Business rule: The database enforces CHECK (Total > 0) on the Invoice table. The application does not validate that the computed total is positive before calling SaveInvoice, so a zero or negative total (e.g. from zero-quantity lines) will throw an unhandled SQL exception. (schema.sql:L8-L8; InvoiceService.vb:L18-L22)",
+      "flags_raised": [
+        "logic_flaw"
+      ],
+      "matches": [
+        {
+          "key_id": "T-05",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F13",
+      "text": "- Business rule: IsOverdue returns true only when the overdue period is strictly greater than 30 days (i.e. 31+ days). A 30-day-old invoice is not considered overdue. The rewrite team must confirm whether the boundary is inclusive or exclusive. (InvoiceService.vb:L40-L42)",
+      "flags_raised": [
+        "logic_flaw"
+      ],
+      "matches": [
+        {
+          "key_id": "T-06",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F14",
+      "text": "- [ISSUE: dead_code] Dead code: LegacyDiscount is a private method that is never called anywhere in the class. The rewrite team must determine whether this 2% discount rule was intentionally retired or was accidentally omitted from the active code path. (InvoiceService.vb:L44-L46)",
+      "flags_raised": [
+        "dead_code"
+      ],
+      "matches": [
+        {
+          "key_id": "T-07",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F15",
+      "text": "- [ISSUE: duplicated_logic] Duplicated logic: Total calculation logic is duplicated between SubmitInvoice (lines 18-21) and RecalculateTotal (lines 32-38), with different tax rates and different rounding modes. There is no single authoritative total-calculation function. (InvoiceService.vb:L18-L21; InvoiceService.vb:L32-L38)",
+      "flags_raised": [
+        "duplicated_logic",
+        "inconsistency"
+      ],
+      "matches": [
+        {
+          "key_id": "T-02",
+          "degree": "full"
+        }
+      ],
+      "verdict": "matched"
+    },
+    {
+      "id": "F16",
+      "text": "- [ISSUE: undocumented_feature] Undocumented feature: The VendorCode column in the database is VARCHAR(10), but there is no length validation in the application. A vendorCode longer than 10 characters will cause a SQL truncation error or exception at runtime. (schema.sql:L6-L6; InvoiceService.vb:L13-L13)",
+      "flags_raised": [
+        "undocumented_feature"
+      ],
+      "matches": [],
+      "verdict": "unmatched"
+    },
+    {
+      "id": "F17",
+      "text": "- [ISSUE: undocumented_feature] Undocumented feature: The InvoiceNo column in the database is VARCHAR(20), but there is no length validation in the application. An invoiceNo longer than 20 characters will cause a SQL truncation error or exception at runtime. (schema.sql:L7-L7; InvoiceService.vb:L14-L14)",
+      "flags_raised": [
+        "undocumented_feature"
+      ],
+      "matches": [],
+      "verdict": "unmatched"
+    }
+  ]
+}

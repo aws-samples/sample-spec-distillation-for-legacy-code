@@ -1,0 +1,52 @@
+{
+  "generated_at": "2026-10-29T22:54:54.474079+00:00",
+  "git": {
+    "commit": "0000000000000000000000000000000000000000",
+    "branch": "main",
+    "dirty": false
+  },
+  "tool_version": "1.0.0",
+  "mutation_schema_version": 1,
+  "command": {
+    "corpus": "synthetic-corpus/ap-invoices",
+    "out": "/tmp/apref",
+    "mutations": 5,
+    "seed": 42,
+    "categories": [
+      "client_check_removed",
+      "constant_alias_rename",
+      "date_off_by_one",
+      "dead_code_orphan",
+      "operator_relax",
+      "rule_to_comment",
+      "silent_cap",
+      "threshold_divergence"
+    ],
+    "lang": "vb",
+    "exclude": [
+      "ANSWER_KEY.yaml",
+      "README.md"
+    ],
+    "avoid_key": [],
+    "avoid_key_margin": 0,
+    "avoid_key_scope": null
+  },
+  "avoid_key_sha256": {},
+  "requested": 5,
+  "applied": 5,
+  "files_copied": 16,
+  "base_corpus_sha256": "e6109e8269e20c7ab299d4517d9f78a00937f7d1b54a4c77a21cb9b81490b4c2",
+  "mutated_corpus_sha256": "f4ffac1cd4c940432a222a31c6ba8a7a50575a0e4d8df7fa6e55dc8f8fda6ecf",
+  "mutations_yaml_sha256": "d2ef0c6db0bfb7ed65d4512dade98cdf567932b6d91bf4b1fe22cacfd6c033b1",
+  "lang": "vb",
+  "roslyn_check": {
+    "status": "not_applicable",
+    "files_checked": 0
+  },
+  "sanity_ok": true,
+  "sanity_problem_count": 0,
+  "rejected_count": 0,
+  "sanity_problems": [],
+  "rejected": [],
+  "python": "3.12.0"
+}

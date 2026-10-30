@@ -1,0 +1,175 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Evaluation suite: synthetic AP Invoices corpus (VB.NET WinForms + SQL Server).
+#
+#   smoke (every commit, no Bedrock, < 60 s):
+#     python3 eval/ci/run_suite.py --config eval/ci/suites/ap-invoices.yaml --smoke \
+#       --out eval/ci/runs/ap-smoke
+#
+#   full run against a pipeline output:
+#     python3 eval/ci/run_suite.py --config eval/ci/suites/ap-invoices.yaml \
+#       --var run=output/ap-invoices --out eval/ci/runs/ap-full
+#
+#   plan only (estimates + the cap each stage would get, no Bedrock calls):
+#     python3 eval/ci/run_suite.py --config eval/ci/suites/ap-invoices.yaml --plan
+#
+# ${run} defaults to the committed reference run. Stages whose inputs are absent are
+# marked `optional: true` and come back as `skipped`, never as a failure.
+#
+# Cost: LLM stages carry no hand-written est_usd. run_suite.py asks each evaluator for its own
+# plan (score.py --dry-run-judge, insights.py --dry-run) and falls back to the measured table in
+# ci/suite_lib.py (CALIBRATED_COSTS): one judge pass of the AP demo bottled spec is ~$3.36.
+
+suite: ap-invoices
+schema_version: 1
+description: >-
+  Spec recall and citation checks on the 48-item AP answer key, plus the deterministic
+  layers that need no LLM: corpus syntax sanity, defect injection, and the
+  mutation-detection floor of an existing pipeline output.
+
+vars:
+  # the analysed source; the launcher passes the run's own copy with --var source_root=...
+  source_root: synthetic-corpus/ap-invoices
+  repo_root: ${source_root}
+  corpus: ${source_root}
+  run: output/ap-invoices-demo
+  key: synthetic-corpus/ap-invoices/ANSWER_KEY.yaml
+  # B1 insights scores the run's Issues & Insights report, not the business spec (which
+  # score-bottled already judges). Override with --var insights_spec=PATH.
+  insights_spec: ${run}/issues/issues.md
+
+budget_usd: 3.0
+
+# score.py judge passes for every score stage (stages may override). score.py's own default
+# is 3; CI uses 1 so that the estimate, the cap and the spend all describe one pass.
+judge_runs: 1
+
+seeds:
+  mutate: 42
+
+corpora:
+  ap-invoices:
+    source_root: ${corpus}
+    key: ${key}
+    # kept out of everything the tool under test sees, and out of the content hash input
+    exclude: [ANSWER_KEY.yaml, README.md]
+
+stages:
+  # ---------------------------------------------------------------- deterministic layers
+  - id: corpus-sanity
+    evaluator: sanity
+    path: ${corpus}
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutate-ap
+    evaluator: mutate
+    corpus_path: ${corpus}
+    mutations: 5
+    seed: 42
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutated-corpus-sanity
+    evaluator: sanity
+    path: ${stage:mutate-ap}/corpus
+    smoke: true
+    est_usd: 0.0
+
+  # How often does the pipeline output for the UNMUTATED corpus already flag the places
+  # the injector touched? That is the detector's false-positive floor, and it must stay
+  # low for the detection rate of a mutated run to mean anything.
+  - id: mutation-control-floor
+    evaluator: mutation_detect
+    mutations: ${stage:mutate-ap}/mutations.yaml
+    output: ${run}/master_blend/master_blend.md
+    source_root: ${stage:mutate-ap}/corpus
+    base_key: ${key}
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  # deterministic and free, so it runs before any LLM stage: a budget abort cannot skip it
+  - id: graph-eval
+    evaluator: graph_eval
+    corpus: ap-invoices
+    run_dir: ${run}
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  # ---------------------------------------------------------------- spec scoring
+  - id: score-master-blend
+    evaluator: score
+    corpus: ap-invoices
+    spec: ${run}/master_blend/master_blend.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  - id: score-bottled
+    evaluator: score
+    corpus: ap-invoices
+    spec: ${run}/bottled_spec/bottled_spec.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  # ---------------------------------------------------------------- benefit evaluation
+  - id: benefits-insights
+    evaluator: benefits_insights
+    corpus: ap-invoices
+    spec: ${insights_spec}
+    optional: true
+    smoke: true
+    smoke_args:
+      no-llm: true
+
+
+thresholds:
+  # exact, deterministic: enforce in smoke too
+  - stage: corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutated-corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutate-ap
+    metric: applied
+    min: 5
+    applies_in_smoke: true
+  - stage: mutate-ap
+    metric: sanity_problem_count
+    max: 0
+    applies_in_smoke: true
+  - stage: mutation-control-floor
+    metric: overall.detection_rate_pct
+    max: 20.0
+    applies_in_smoke: true
+  - stage: score-master-blend
+    metric: citations.validity_pct
+    min: 99.0
+    applies_in_smoke: true
+
+  # LLM-judged: full runs only
+  - stage: score-master-blend
+    metric: recall.any_match_pct
+    min: 85.0
+  - stage: score-master-blend
+    metric: recall.strict_full_pct
+    min: 65.0
+  - stage: score-master-blend
+    metric: precision.incorrect
+    max: 3
+  - stage: score-bottled
+    metric: recall.any_match_pct
+    min: 85.0

@@ -1,0 +1,1 @@
+{"ts": "2026-10-05T17:21:53.386654+00:00", "tag": "benefits:qa:judge", "model": "us.anthropic.claude-sonnet-4-6", "input_tokens": 693, "output_tokens": 99, "cost_usd": 0.003564, "latency_s": 2.36, "stop_reason": "end_turn"}

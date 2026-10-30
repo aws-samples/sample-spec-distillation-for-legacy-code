@@ -1,0 +1,94 @@
+{
+  "benefit": "B2/B5 Q&A",
+  "script": "qa_eval",
+  "tool": "fake-cmd",
+  "adapter": "command",
+  "qa": "eval/benefits/fixtures/toy/qa.yaml",
+  "source_root": "eval/benefits/fixtures/toy/src",
+  "context_truncated": null,
+  "summary": {
+    "questions": 1,
+    "questions_total": 1,
+    "correct_pct": 0.0,
+    "score_pct": 0.0,
+    "wrong": 1,
+    "engineer_correct_pct": 0.0,
+    "product_correct_pct": null,
+    "trick_correct_pct": null,
+    "trick_abstain_pct": null,
+    "plain_language_avg": null,
+    "answers_with_citations_pct": 100.0,
+    "citation_validity_pct": 50.0,
+    "citation_supported_pct": 0.0,
+    "citation_hits_reference_pct": 0.0,
+    "answer_tokens_in": 100,
+    "answer_tokens_out": 10,
+    "answer_cost_usd": 0.0004,
+    "latency_avg_s": 0.03,
+    "errors": 0
+  },
+  "budget": {
+    "calls": 2,
+    "input_tokens": 793,
+    "output_tokens": 109,
+    "cost_usd": 0.004,
+    "max_usd": 0.05,
+    "stopped": null
+  },
+  "questions": [
+    {
+      "id": "Q-E1",
+      "audience": "engineer",
+      "question": "What is the maximum number of lines an invoice submitted through SubmitInvoice can have, and what is returned when it is exceeded?",
+      "reference_answer": "25 lines (MAX_LINES = 25); more returns ERR_TOO_MANY_LINES. The comment saying 10 is stale.",
+      "reference_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 16,
+          "end_line": 16
+        }
+      ],
+      "answer": "10 lines per invoice (asked: What is the maximum )",
+      "evidence_class": "comment",
+      "cannot_determine": null,
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 7,
+          "end_line": 7,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "Nope.vb",
+          "start_line": 3,
+          "end_line": 3,
+          "resolved": null,
+          "valid": false,
+          "reason": "file not found"
+        }
+      ],
+      "citation_overlaps_reference": false,
+      "tokens_in": 100,
+      "tokens_out": 10,
+      "cost_usd": 0.00045,
+      "latency_s": 0.03,
+      "error": null,
+      "grade": {
+        "id": "Q-E1",
+        "correctness": "wrong",
+        "citation_support": "partial",
+        "trick_handling": "n/a",
+        "plain_language": null,
+        "jargon": [],
+        "note": "Tool cited stale comment saying 10; actual MAX_LINES=25 and ERR_TOO_MANY_LINES return value both missed."
+      }
+    }
+  ]
+}

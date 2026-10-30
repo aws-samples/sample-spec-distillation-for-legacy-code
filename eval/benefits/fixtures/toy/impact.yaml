@@ -1,0 +1,20 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Toy impact-analysis set for eval/benefits/impact_eval.py self-tests.
+changes:
+  - id: I-1
+    change: The sales tax rate on invoice lines changes from its current value to 9%.
+    affected_locations:
+      - {file: InvoiceService.vb, start_line: 20, end_line: 20, duplicate_group: tax}
+      - {file: InvoiceService.vb, start_line: 35, end_line: 35, duplicate_group: tax}
+      - {file: InvoiceService.vb, start_line: 22, end_line: 22}
+    affected_rules: [T-02]
+    affected_reports: []
+    affected_contracts: [SubmitInvoice]
+  - id: I-2
+    change: Increase the automatic approval ceiling for ZZ vendors from 50000 to 75000.
+    affected_locations:
+      - {file: schema.sql, start_line: 20, end_line: 21}
+    affected_rules: [T-04, T-03]
+    affected_reports: []
+    affected_contracts: [usp_SaveInvoice]

@@ -1,0 +1,11 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Runtime dependencies of the pipeline (installed by ../../setup.sh into .venv).
+boto3>=1.42.0
+mcp>=1.2,<2              # FastMCP lives at mcp.server in the 1.x line
+sentence-transformers>=3.0.0
+networkx>=3.3
+numpy>=1.26.0
+hnswlib>=0.8.0
+olefile>=0.47            # ingest helper: list streams of OLE compound-document binaries (.rpt)
+PyYAML>=6.0

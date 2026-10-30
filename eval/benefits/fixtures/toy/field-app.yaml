@@ -1,0 +1,28 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Toy field-app compatibility key for eval/benefits/fieldapp_eval.py self-tests.
+items:
+  - id: FA-1
+    category: required_field
+    requirement: vendorCode and invoiceNo are required (ERR_VENDOR_REQUIRED / ERR_INVOICE_NO_REQUIRED) and at least one line is required (ERR_NO_LINES).
+    locations: [{file: InvoiceService.vb, start_line: 13, end_line: 15}]
+  - id: FA-2
+    category: limit
+    requirement: At most 25 lines per invoice (ERR_TOO_MANY_LINES), not 10 as the comment says.
+    locations: [{file: InvoiceService.vb, start_line: 8, end_line: 8}, {file: InvoiceService.vb, start_line: 16, end_line: 16}]
+  - id: FA-3
+    category: limit
+    requirement: Computed total including tax must not exceed 100000 (ERR_AMOUNT_LIMIT).
+    locations: [{file: InvoiceService.vb, start_line: 9, end_line: 9}, {file: InvoiceService.vb, start_line: 22, end_line: 22}]
+  - id: FA-4
+    category: status
+    requirement: The call returns status PENDING_APPROVAL or APPROVED (ZZ vendors), or an ERR_* code; the stored status may be downgraded to PENDING_APPROVAL above 50000 even if APPROVED was returned.
+    locations: [{file: InvoiceService.vb, start_line: 24, end_line: 29}, {file: schema.sql, start_line: 20, end_line: 21}]
+  - id: FA-5
+    category: server_validation
+    requirement: (VendorCode, InvoiceNo) must be unique and total must be > 0; enforced only by the database, so the app must handle an insert failure / avoid resubmitting the same invoice number.
+    locations: [{file: schema.sql, start_line: 8, end_line: 8}, {file: schema.sql, start_line: 11, end_line: 11}]
+  - id: FA-6
+    category: payload
+    requirement: Field lengths - vendorCode max 10 chars, invoiceNo max 20 chars (database column sizes).
+    locations: [{file: schema.sql, start_line: 6, end_line: 7}]

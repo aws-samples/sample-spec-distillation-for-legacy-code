@@ -1,0 +1,4 @@
+# Judge verdict cache: regenerable from Bedrock, and large. Keep the directory,
+# ignore the contents, so a clean checkout does not carry other runs' verdicts.
+*
+!.gitignore

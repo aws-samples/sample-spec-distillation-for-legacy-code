@@ -1,0 +1,574 @@
+{
+ "scorer_version": "2026-10-06.hardened-1",
+ "spec": "/work/demo/out/ap-fixture-run/bottled_spec/bottled_spec.md",
+ "key": "synthetic-corpus/ap-invoices/ANSWER_KEY.yaml",
+ "source_root": "synthetic-corpus/ap-invoices",
+ "method": "llm",
+ "counts": {
+  "key_items": 48,
+  "core_items": 0,
+  "findings": 486,
+  "citations": 725
+ },
+ "recall": {
+  "strict_full_pct": 70.8,
+  "partial_credit_pct": 83.3,
+  "any_match_pct": 95.8,
+  "core_full_pct": null,
+  "core_any_pct": null,
+  "full": 34,
+  "partial": 12,
+  "missed": 2
+ },
+ "precision": {
+  "keyed_pct": 73.3,
+  "correct_pct": 80.0,
+  "keyed_pct_of_decided": 73.9,
+  "findings_matched": 356,
+  "correct_extra": 33,
+  "unsupported": 93,
+  "incorrect": 1,
+  "uncertain": 4,
+  "unjudged": 0,
+  "decided": 482
+ },
+ "citations": {
+  "validity_pct": 100.0,
+  "valid": 725,
+  "invalid": 0,
+  "off_by_one": 0,
+  "validity_pct_allowing_off_by_one": 100.0,
+  "by_category": {
+   "ok": 725,
+   "off_by_one_end": 0,
+   "phantom_line_only": 0,
+   "out_of_range": 0,
+   "file_not_found": 0,
+   "bad_range": 0,
+   "no_file_context": 0
+  },
+  "accuracy_pct": 58.7,
+  "accuracy_num": 370,
+  "accuracy_den": 630,
+  "findings_without_citation": 180
+ },
+ "source_coverage": {
+  "source_lines": 2320,
+  "source_lines_cited": 1779,
+  "source_line_coverage_pct": 76.7,
+  "files_never_cited": [],
+  "files_never_cited_n": 0,
+  "key_locations": {
+   "total": 149,
+   "cited": 137,
+   "pct": 91.9,
+   "items_with_any_location_cited": 47,
+   "items_fully_cited": 37
+  }
+ },
+ "structural": {
+  "requirement_ids_defined": 317,
+  "duplicate_requirement_ids": [],
+  "duplicate_requirement_ids_n": 0,
+  "unresolved_cross_references": [],
+  "unresolved_cross_references_n": 0,
+  "answer_key_ids_mentioned": [],
+  "requirements_without_citation": [
+   "DL-0027",
+   "ST-0001",
+   "IF-0047"
+  ],
+  "requirements_without_citation_n": 11,
+  "requirement_units": 317,
+  "orphan_citations": 0,
+  "orphan_citations_applicable": true,
+  "orphan_citation_findings": [],
+  "index_entries_without_definition": [],
+  "index_entries_without_definition_n": 0,
+  "thin_requirements": [],
+  "thin_requirements_n": 0,
+  "malformed": {
+   "heading_level_jumps": [],
+   "heading_level_jumps_n": 0,
+   "empty_sections": [],
+   "empty_sections_n": 0,
+   "duplicate_headings_n": 149,
+   "unclosed_code_fence": false
+  }
+ },
+ "possible_inventions": [
+  {
+   "finding_id": "F427",
+   "verdict": "incorrect",
+   "note": "Claims 'at or above $10,000' but usp_APInvPost uses strictly greater than (>), not >=. Contradicts BR-020.",
+   "invalid_citations": [],
+   "text": "#### [PM-0008] Access Rule: Invoices At or Above Threshold Require Approval\n**Requirement:** The system SHALL NOT auto-p"
+  }
+ ],
+ "key_coverage": {
+  "BR-001": "full",
+  "BR-002": "full",
+  "BR-003": "full",
+  "BR-004": "full",
+  "BR-005": "full",
+  "BR-006": "full",
+  "BR-007": "full",
+  "BR-008": "full",
+  "BR-009": "full",
+  "BR-010": "full",
+  "BR-011": "full",
+  "BR-012": "full",
+  "BR-013": "full",
+  "BR-014": "full",
+  "BR-015": "full",
+  "BR-016": "full",
+  "BR-017": "partial",
+  "BR-018": "full",
+  "BR-019": "full",
+  "BR-020": "full",
+  "BR-021": "full",
+  "BR-022": "full",
+  "BR-023": "full",
+  "BR-024": "full",
+  "BR-025": "full",
+  "BR-026": "full",
+  "BR-027": "full",
+  "BR-028": "partial",
+  "BR-029": "partial",
+  "BR-030": "full",
+  "ST-001": "partial",
+  "ST-002": "partial",
+  "ST-003": "partial",
+  "ST-004": "full",
+  "ST-005": "full",
+  "ST-006": "partial",
+  "ST-100": "full",
+  "WF-001": "full",
+  "WF-002": "full",
+  "WF-003": "full",
+  "WF-004": "partial",
+  "EX-001": "partial",
+  "EX-002": "partial",
+  "EX-003": "partial",
+  "EX-004": "partial",
+  "EX-005": "full",
+  "EX-006": "missed",
+  "EX-007": "missed"
+ },
+ "recall_by": {
+  "type": {
+   "exception": {
+    "n": 7,
+    "full": 1,
+    "partial": 4,
+    "missed": 2,
+    "full_pct": 14.3,
+    "any_pct": 71.4
+   },
+   "rule": {
+    "n": 30,
+    "full": 27,
+    "partial": 3,
+    "missed": 0,
+    "full_pct": 90.0,
+    "any_pct": 100.0
+   },
+   "state": {
+    "n": 7,
+    "full": 3,
+    "partial": 4,
+    "missed": 0,
+    "full_pct": 42.9,
+    "any_pct": 100.0
+   },
+   "workflow": {
+    "n": 4,
+    "full": 3,
+    "partial": 1,
+    "missed": 0,
+    "full_pct": 75.0,
+    "any_pct": 100.0
+   }
+  },
+  "evidence": {
+   "Confirmation Required": {
+    "n": 3,
+    "full": 3,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "Inferred": {
+    "n": 4,
+    "full": 2,
+    "partial": 2,
+    "missed": 0,
+    "full_pct": 50.0,
+    "any_pct": 100.0
+   },
+   "Unknown": {
+    "n": 3,
+    "full": 1,
+    "partial": 0,
+    "missed": 2,
+    "full_pct": 33.3,
+    "any_pct": 33.3
+   },
+   "Verified": {
+    "n": 38,
+    "full": 28,
+    "partial": 10,
+    "missed": 0,
+    "full_pct": 73.7,
+    "any_pct": 100.0
+   }
+  },
+  "flag": {
+   "(none)": {
+    "n": 42,
+    "full": 30,
+    "partial": 10,
+    "missed": 2,
+    "full_pct": 71.4,
+    "any_pct": 95.2
+   },
+   "comment_only": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "db_only": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "dead_code": {
+    "n": 2,
+    "full": 1,
+    "partial": 1,
+    "missed": 0,
+    "full_pct": 50.0,
+    "any_pct": 100.0
+   },
+   "inconsistency": {
+    "n": 2,
+    "full": 1,
+    "partial": 1,
+    "missed": 0,
+    "full_pct": 50.0,
+    "any_pct": 100.0
+   }
+  }
+ },
+ "segmentation": {
+  "strategy_requested": "requirements",
+  "strategy": "requirements",
+  "strategy_doc": "one finding per requirement id; index-table rows fold into their requirement; remaining prose is reported separately as narrative",
+  "findings": 486,
+  "by_kind": {
+   "narrative": 169,
+   "requirement": 317
+  },
+  "merged_entry_findings": 0,
+  "requirement_ids_in_spec": 317,
+  "finding_chars": {
+   "min": 91,
+   "median": 962.0,
+   "max": 1846,
+   "total": 427522
+  },
+  "spec_bytes": 438452,
+  "findings_truncated": 0
+ },
+ "judge": {
+  "plan": {
+   "findings": 486,
+   "batches": 13,
+   "runs": 3,
+   "calls": 39,
+   "evidence_mode": "chunked",
+   "evidence_chars": {
+    "min": 16456,
+    "max": 59745,
+    "total_per_run": 468789
+   },
+   "evidence_truncated_batches": 1,
+   "est_input_tokens": 912139,
+   "est_output_tokens": 138510,
+   "est_cost_usd": 4.8141,
+   "model": "us.anthropic.claude-sonnet-4-6",
+   "schema_version": "2026-10-06.1",
+   "schema_hash": "56331fbe30e27358",
+   "temperature": 0.0,
+   "cache_enabled": true
+  },
+  "runs": 3,
+  "model": "us.anthropic.claude-sonnet-4-6",
+  "schema_version": "2026-10-06.1",
+  "schema_hash": "56331fbe30e27358",
+  "temperature": 0.0,
+  "evidence_mode": "chunked",
+  "evidence_truncated_batches": 1,
+  "cache": {
+   "enabled": true,
+   "hits": 39,
+   "misses": 0,
+   "writes": 0,
+   "hit_rate_pct": 100.0
+  },
+  "issues": [],
+  "issues_n": 0,
+  "consensus_rule": "a verdict or key match needs strictly more than half the passes; otherwise the finding is reported as 'uncertain' / no-majority",
+  "determinism": {
+   "temperature": 0.0,
+   "key_items_sorted": true,
+   "findings_sorted": true,
+   "pass_salt": "the prompt differs between passes only by 'Evaluation pass k of N', so measured across-pass spread is a LOWER BOUND on judge noise"
+  },
+  "abstention": {
+   "uncertain_findings": 4,
+   "uncertain_pct": 0.8,
+   "no_majority_findings": 0
+  },
+  "agreement": {
+   "mean_per_finding": 0.979,
+   "unanimous_findings": 456,
+   "unanimous_pct": 93.8,
+   "fleiss_kappa_verdicts": 0.8997,
+   "fleiss_kappa_verdicts_label": "almost perfect",
+   "fleiss_kappa_key_coverage": 0.861,
+   "fleiss_kappa_key_coverage_label": "almost perfect",
+   "mean_pairwise_cohen_verdicts": 0.8988,
+   "mean_pairwise_cohen_key_coverage": 0.8605
+  },
+  "across_runs": {
+   "recall_strict_full_pct": {
+    "min": 70.8,
+    "median": 75.0,
+    "max": 77.1,
+    "runs": [
+     77.1,
+     70.8,
+     75.0
+    ]
+   },
+   "recall_any_match_pct": {
+    "min": 95.8,
+    "median": 95.8,
+    "max": 95.8,
+    "runs": [
+     95.8,
+     95.8,
+     95.8
+    ]
+   },
+   "precision_keyed_pct": {
+    "min": 72.8,
+    "median": 73.5,
+    "max": 77.2,
+    "runs": [
+     73.5,
+     72.8,
+     77.2
+    ]
+   },
+   "incorrect": {
+    "min": 1.0,
+    "median": 1.0,
+    "max": 1.0,
+    "runs": [
+     1.0,
+     1.0,
+     1.0
+    ]
+   },
+   "uncertain": {
+    "min": 0.0,
+    "median": 4.0,
+    "max": 4.0,
+    "runs": [
+     4.0,
+     0.0,
+     4.0
+    ]
+   }
+  },
+  "bootstrap_ci95": {
+   "basis": "percentile bootstrap resampling KEY ITEMS (recall) or FINDINGS (precision) from the majority-vote labels; it measures small-sample uncertainty, not judge noise, and does not shrink with more judge passes",
+   "iters": 2000,
+   "seed": 20261006,
+   "recall_strict_full_pct": {
+    "point": 70.8,
+    "lo": 58.3,
+    "hi": 83.3,
+    "n": 48,
+    "iters": 2000
+   },
+   "recall_any_match_pct": {
+    "point": 95.8,
+    "lo": 89.6,
+    "hi": 100.0,
+    "n": 48,
+    "iters": 2000
+   },
+   "recall_partial_credit_pct": {
+    "point": 83.3,
+    "lo": 75.0,
+    "hi": 90.6,
+    "n": 48,
+    "iters": 2000
+   },
+   "precision_keyed_pct": {
+    "point": 73.3,
+    "lo": 69.1,
+    "hi": 77.4,
+    "n": 486,
+    "iters": 2000
+   }
+  },
+  "golden": {
+   "source": "eval/judge/golden/ap-bottled.yaml",
+   "labelled_by": "reviewer-1",
+   "labelled_on": "2026-10-06",
+   "spec": "output/ap-invoices-demo/bottled_spec/bottled_spec.md",
+   "n_labelled": 15,
+   "agreement_pct": 86.7,
+   "found_vs_missed_agreement_pct": 100.0,
+   "cohen_kappa": 0.6875,
+   "confusion": {
+    "full->full": 10,
+    "full->partial": 1,
+    "missed->missed": 2,
+    "partial->full": 1,
+    "partial->partial": 1
+   },
+   "items": [
+    {
+     "key_id": "BR-015",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "DT-0013 states half-away-from-zero to the cent, matching SQL ROUND rather than .NET banker's rounding, and names the production bug. TS-0017 adds that it applie"
+    },
+    {
+     "key_id": "BR-018",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "Trap db_only. Five requirements state the rule, the rcode 12 message and that it is \"enforced in usp_APInvPost\". The enforcement layer is therefore explicit, wh"
+    },
+    {
+     "key_id": "BR-019",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "Trap dead_code. RL-0050 is titled \"(Deprecated)\", states the 2%/10-day terms, that APPayTerms superseded it in 2011, and that it \"SHOULD NOT be relied upon or i"
+    },
+    {
+     "key_id": "BR-020",
+     "expected": "partial",
+     "observed": "full",
+     "agree": false,
+     "basis": "Trap inconsistency, and the one label where I disagree with the judge. The key's essential claim is that the UI boundary is >= and the proc boundary is strictly"
+    },
+    {
+     "key_id": "BR-021",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "Trap comment_only. RL-0014's title is \"Should Be Exempt From Retainage (Unenforced)\" and the text says the policy is implemented only by manually setting DfltRe"
+    },
+    {
+     "key_id": "BR-026",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "RL-0004 states the >365-day warning is non-blocking and \"informational only (Debug.WriteLine), not surfaced to the user\". EX-0033 adds the 2009-style audit rati"
+    },
+    {
+     "key_id": "BR-027",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "EX-0010 states the queue filter applies only when role = ROLE_PM and \"Show All\" is unchecked, and that any user with Show All checked sees the unfiltered queue;"
+    },
+    {
+     "key_id": "BR-028",
+     "expected": "partial",
+     "observed": "partial",
+     "agree": true,
+     "basis": "Trap inconsistency (latent), two parts. The lien-waiver part is stated: EX-0018 calls the $5,000 entry-screen threshold \"hardcoded\". The role-limit part is not:"
+    },
+    {
+     "key_id": "BR-029",
+     "expected": "full",
+     "observed": "partial",
+     "agree": false,
+     "basis": "Trap dead_code (secondary), two parts, both stated. DT-0047 and DL-0018 both annotate the APCoParm attribute as \"MgrHoldDays (unused)\", and RL-0027 / EX-0008 ar"
+    },
+    {
+     "key_id": "BR-030",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "DL-0024 gives the OpenPayable formula and \"Payable Now = 0 when PayBlocked='Y' or Status<>'A'\"; DL-0009 defines PayBlocked as any open non-RET hold; WF-0028 cov"
+    },
+    {
+     "key_id": "ST-005",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "DL-0003 lists \"Paid ('X') - final\" and EX-0038 treats X as terminal. The key's parenthetical (\"legacy cleared code\", \"nothing in this corpus sets X\") is provena"
+    },
+    {
+     "key_id": "ST-100",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "ST-0022 and EX-0038 both write out the exact whitelist O->P/A/V, P->A/O/V, A->H/X/V, H->A/V, note that X and V are terminal (so H->X is absent), and say the tri"
+    },
+    {
+     "key_id": "EX-005",
+     "expected": "full",
+     "observed": "full",
+     "agree": true,
+     "basis": "EX-0035 states that a failed line insert after a successful header insert leaves a header with no lines, that there is no transaction around the two, and that r"
+    },
+    {
+     "key_id": "EX-006",
+     "expected": "missed",
+     "observed": "missed",
+     "agree": true,
+     "basis": "Nothing in the spec addresses the absent payment process. Searching the 317 requirements for \"check run\", \"EFT\", \"PaidAmt\" and \"payment process\" returns entity "
+    },
+    {
+     "key_id": "EX-007",
+     "expected": "missed",
+     "observed": "missed",
+     "agree": true,
+     "basis": "The spec covers rejection itself (EX-0006: reason required, ApprBy/ApprDate cleared, PostedYN reset) but not the gap. EX-0006 even asserts that rejection \"retur"
+    }
+   ]
+  }
+ },
+ "judge_usage": {
+  "calls": 0,
+  "cached_calls": 39,
+  "input_tokens": 0,
+  "output_tokens": 0,
+  "cost_usd": 0.0,
+  "retries": 0,
+  "schema_retries": 0,
+  "missing_retries": 0
+ },
+ "generation_usage": null,
+ "findings_reported": 486,
+ "findings_total": 486
+}

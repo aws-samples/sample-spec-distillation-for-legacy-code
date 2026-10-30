@@ -1,0 +1,606 @@
+{
+  "benefit": "B4 field-app spec",
+  "script": "fieldapp_eval",
+  "tool": "raw-code",
+  "adapter": "raw-code",
+  "key": "eval/benefits/fixtures/toy/field-app.yaml",
+  "source_root": "eval/benefits/fixtures/toy/src",
+  "context_truncated": false,
+  "request": "We are building a new Android field app that will submit records to this system through its external API (the entry point(s) other systems or devices call). Write a compatibility spec the mobile team can build against: the request payload and field formats/lengths, required fields, every server-side validation and the error it produces, the statuses a submitted record can get (returned and stored), and any limits. State only what the system actually does today.",
+  "summary": {
+    "key_items": 6,
+    "requirements_produced": 19,
+    "recall_full_pct": 100.0,
+    "recall_any_pct": 100.0,
+    "key_items_contradicted": 0,
+    "wrong_requirements": 0,
+    "invented_requirements": 0,
+    "precision_keyed_pct": 84.2,
+    "precision_correct_pct": 100.0,
+    "citation_validity_pct": 100.0,
+    "requirements_without_citation": 0,
+    "recall_limit_pct": 100.0,
+    "recall_payload_pct": 100.0,
+    "recall_required_field_pct": 100.0,
+    "recall_server_validation_pct": 100.0,
+    "recall_status_pct": 100.0,
+    "answer_tokens_in": 1541,
+    "answer_tokens_out": 2349,
+    "answer_cost_usd": 0.039858,
+    "latency_s": 19.67,
+    "errors": 0
+  },
+  "budget": {
+    "calls": 2,
+    "input_tokens": 4610,
+    "output_tokens": 3295,
+    "cost_usd": 0.0633,
+    "max_usd": 0.3,
+    "stopped": null
+  },
+  "items": [
+    {
+      "id": "FA-1",
+      "category": "required_field",
+      "requirement": "vendorCode and invoiceNo are required (ERR_VENDOR_REQUIRED / ERR_INVOICE_NO_REQUIRED) and at least one line is required (ERR_NO_LINES).",
+      "locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 13,
+          "end_line": 15
+        }
+      ],
+      "coverage": "full"
+    },
+    {
+      "id": "FA-2",
+      "category": "limit",
+      "requirement": "At most 25 lines per invoice (ERR_TOO_MANY_LINES), not 10 as the comment says.",
+      "locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 16,
+          "end_line": 16
+        }
+      ],
+      "coverage": "full"
+    },
+    {
+      "id": "FA-3",
+      "category": "limit",
+      "requirement": "Computed total including tax must not exceed 100000 (ERR_AMOUNT_LIMIT).",
+      "locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 9,
+          "end_line": 9
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 22,
+          "end_line": 22
+        }
+      ],
+      "coverage": "full"
+    },
+    {
+      "id": "FA-4",
+      "category": "status",
+      "requirement": "The call returns status PENDING_APPROVAL or APPROVED (ZZ vendors), or an ERR_* code; the stored status may be downgraded to PENDING_APPROVAL above 50000 even if APPROVED was returned.",
+      "locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 29
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21
+        }
+      ],
+      "coverage": "full"
+    },
+    {
+      "id": "FA-5",
+      "category": "server_validation",
+      "requirement": "(VendorCode, InvoiceNo) must be unique and total must be > 0; enforced only by the database, so the app must handle an insert failure / avoid resubmitting the same invoice number.",
+      "locations": [
+        {
+          "file": "schema.sql",
+          "start_line": 8,
+          "end_line": 8
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 11,
+          "end_line": 11
+        }
+      ],
+      "coverage": "full"
+    },
+    {
+      "id": "FA-6",
+      "category": "payload",
+      "requirement": "Field lengths - vendorCode max 10 chars, invoiceNo max 20 chars (database column sizes).",
+      "locations": [
+        {
+          "file": "schema.sql",
+          "start_line": 6,
+          "end_line": 7
+        }
+      ],
+      "coverage": "full"
+    }
+  ],
+  "requirements": [
+    {
+      "id": "R1",
+      "category": "payload",
+      "statement": "The request payload must include a vendorCode field of type string, mapping to VARCHAR(10) in the database.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 11,
+          "end_line": 12,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 6,
+          "end_line": 6,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-6"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R2",
+      "category": "payload",
+      "statement": "The request payload must include an invoiceNo field of type string, mapping to VARCHAR(20) in the database.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 11,
+          "end_line": 12,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 7,
+          "end_line": 7,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-6"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R3",
+      "category": "payload",
+      "statement": "The request payload must include a lines field that is a list/array of InvoiceLine objects, each containing at minimum a Qty (quantity) and UnitPrice field.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 11,
+          "end_line": 12,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 19,
+          "end_line": 21,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "correct_extra",
+      "key_ids": [],
+      "note": ""
+    },
+    {
+      "id": "R4",
+      "category": "required_field",
+      "statement": "vendorCode is required; if it is null or empty the server returns the error string 'ERR_VENDOR_REQUIRED' and does not persist the record.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 13,
+          "end_line": 13,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-1"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R5",
+      "category": "required_field",
+      "statement": "invoiceNo is required; if it is null or empty the server returns the error string 'ERR_INVOICE_NO_REQUIRED' and does not persist the record.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 14,
+          "end_line": 14,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-1"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R6",
+      "category": "required_field",
+      "statement": "The lines list is required and must contain at least one element; if it is null or empty the server returns the error string 'ERR_NO_LINES' and does not persist the record.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 15,
+          "end_line": 15,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-1"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R7",
+      "category": "limit",
+      "statement": "The lines list must not exceed 25 items; if lines.Count > 25 the server returns the error string 'ERR_TOO_MANY_LINES' and does not persist the record.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 16,
+          "end_line": 16,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-2"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R8",
+      "category": "server_validation",
+      "statement": "The server computes the invoice total as the sum of (Qty * UnitPrice * 1.08), with each line's contribution rounded to 2 decimal places before summing. The client should expect this tax rate (8%) to be applied server-side.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 18,
+          "end_line": 21,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "correct_extra",
+      "key_ids": [],
+      "note": ""
+    },
+    {
+      "id": "R9",
+      "category": "limit",
+      "statement": "The computed total (after 8% tax) must not exceed 100,000.00; if total > 100000 the server returns the error string 'ERR_AMOUNT_LIMIT' and does not persist the record.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 9,
+          "end_line": 9,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 22,
+          "end_line": 22,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-3"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R10",
+      "category": "status",
+      "statement": "If vendorCode starts with the prefix 'ZZ', the server assigns status 'APPROVED' before saving.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-4"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R11",
+      "category": "status",
+      "statement": "If vendorCode does not start with 'ZZ', the server assigns status 'PENDING_APPROVAL' before saving.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-4"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R12",
+      "category": "status",
+      "statement": "The SubmitInvoice entry point returns the status string that was assigned ('APPROVED' or 'PENDING_APPROVAL') on success.",
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 28,
+          "end_line": 29,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-4"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R13",
+      "category": "server_validation",
+      "statement": "The stored procedure usp_SaveInvoice overrides the status to 'PENDING_APPROVAL' if the computed total exceeds 50,000 AND the incoming status is 'APPROVED'. Therefore a ZZ-vendor invoice with total > 50,000 will be stored as 'PENDING_APPROVAL' even though the application layer returns 'APPROVED'.",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 25,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-4"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R14",
+      "category": "status",
+      "statement": "The only two status values that can be stored in the Invoice table are 'APPROVED' and 'PENDING_APPROVAL', constrained to VARCHAR(20).",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 9,
+          "end_line": 9,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-4"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R15",
+      "category": "server_validation",
+      "statement": "The combination of (VendorCode, InvoiceNo) must be unique in the database; submitting a duplicate pair will cause a database-level unique constraint violation (no application-layer error code is defined for this case).",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 11,
+          "end_line": 11,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-5"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R16",
+      "category": "server_validation",
+      "statement": "The stored total must be greater than 0; a database CHECK constraint rejects any insert where Total <= 0.",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-5"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R17",
+      "category": "payload",
+      "statement": "vendorCode must be no longer than 10 characters to satisfy the VARCHAR(10) column constraint; values exceeding this length will cause a database-level error.",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 6,
+          "end_line": 6,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 16,
+          "end_line": 16,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-6"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R18",
+      "category": "payload",
+      "statement": "invoiceNo must be no longer than 20 characters to satisfy the VARCHAR(20) column constraint; values exceeding this length will cause a database-level error.",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 7,
+          "end_line": 7,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 16,
+          "end_line": 16,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "matched",
+      "key_ids": [
+        "FA-6"
+      ],
+      "note": ""
+    },
+    {
+      "id": "R19",
+      "category": "payload",
+      "statement": "The Total stored in the database is typed DECIMAL(12,2), meaning the maximum storable total is 9,999,999,999.99 with exactly 2 decimal places of precision.",
+      "citations": [
+        {
+          "file": "schema.sql",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 17,
+          "end_line": 17,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "verdict": "correct_extra",
+      "key_ids": [],
+      "note": ""
+    }
+  ],
+  "generation_error": null
+}

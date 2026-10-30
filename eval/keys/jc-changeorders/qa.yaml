@@ -1,0 +1,400 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+#
+# Q&A key - synthetic JC Change Orders corpus. Tests "onboarding" and "product-team self-service"
+# benefits: can a distilled spec answer real questions correctly, with citations?
+# Paths are relative to synthetic-corpus/jc-changeorders/. Line ranges are 1-based, inclusive.
+#
+# audience:       engineer | product | trick
+# answer_kind:    definitive       - the code settles it
+#                 inconsistent     - layers disagree; a correct answer must say so and say which wins where
+#                 not_determinable - the corpus does not contain the answer; a correct answer must say so
+# related_items:  ANSWER_KEY.yaml ids
+# Scoring hint: for inconsistent / not_determinable questions, a confident single answer is WRONG.
+
+corpus: jc-changeorders
+version: 1
+
+questions:
+
+  # ===========================================================================
+  # ENGINEER ONBOARDING (12)
+  # ===========================================================================
+
+  - id: QA-01
+    audience: engineer
+    question: Where is change order markup computed, and which value wins?
+    answer_kind: inconsistent
+    reference_answer: >-
+      There are four copies. (1) usp_JCCOSubmit computes ROUND(Cost * Pct / 100, 2) on the summed cost.
+      It caps subcontract COs at 5% and writes MarkupAmt/TotalAmt; this is the stored value and it wins for
+      anything submitted. (2) frmJCCOEntry.RecalcPreview rounds per line (AwayFromZero) and sums. SaveTotals
+      stores this preview until submit, and it stays permanently for Save & Approve COs. (3)
+      clsJCCOBL.CalcTotals uses banker's rounding on the total and has no callers. (4) Report 615
+      @MarkupEarned recomputes from the stored MarkupPct and ignores the 5% sub cap, so the report can
+      disagree with MarkupAmt.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 92}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 164, end_line: 180}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 49, end_line: 65}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 32}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 187, end_line: 197}
+    related_items: [BR-003, BR-004, BR-007, BR-027]
+
+  - id: QA-02
+    audience: engineer
+    question: Where is the PM / executive approval threshold defined, and what happens at exactly $50,000.00?
+    answer_kind: inconsistent
+    reference_answer: >-
+      It is defined in JCCoParm.COApprThreshold (50000), the JCCOApprLim PM row (50000),
+      modJCGlobals.CO_PM_LIMIT (50000D), the hardcoded 50000 in report 615, and through CO_PM_LIMIT in the
+      export flag. At exactly $50,000.00: clsJCCOBL.RequiresExecApproval (>=) blocks a PM in the approval
+      screen, and the export says requiresExecApproval = true. usp_JCCOApprove (Total > Thr), the entry
+      label (>) and the report (>) all treat it as within PM authority.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 144, end_line: 146}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 97, end_line: 101}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 39, end_line: 42}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 18, end_line: 18}
+      - {file: Scripts/Reports/615.sql, start_line: 31, end_line: 31}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 91, end_line: 91}
+    related_items: [BR-009]
+
+  - id: QA-03
+    audience: engineer
+    question: Which status transitions are allowed and where is that enforced? Why is Draft -> Approved allowed?
+    answer_kind: definitive
+    reference_answer: >-
+      trg_JCCOHdr_u allows D>P, D>A, D>V, P>A, P>R, R>D, R>V, A>I, A>V. D>A exists for the T&M owner
+      auto-approval in usp_JCCOSubmit and the Save & Approve direct update. clsJCCOBL.IsTransitionAllowed
+      omits D>A, but nothing calls it.
+    locations:
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 39, end_line: 49}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 200, end_line: 210}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 112}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 199, end_line: 207}
+    related_items: [ST-002, BR-024, BR-027]
+
+  - id: QA-04
+    audience: engineer
+    question: In what order does usp_JCCOApprove check an approval, and what can skip those checks?
+    answer_kind: definitive
+    reference_answer: >-
+      The order is: CO exists, then status is P, then (for approve) the user has an active non-ENTRY role,
+      then SoD (EntBy != user). Next come the override, and then the PM > threshold and role MaxAmt checks,
+      which are skipped when the override is active. For sub COs it then checks SL open, insurance present and
+      unexpired, and the cap on A+I cost. On success it sets A, ApprBy, ApprDate and OvrFlag. The checks are
+      skipped entirely by Save & Approve, which never calls the proc. The limit checks are skipped by the
+      JCAdmUsers override.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 40, end_line: 145}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279}
+    related_items: [BR-010, BR-011, BR-012, BR-023, BR-025, BR-027]
+
+  - id: QA-05
+    audience: engineer
+    question: Which code writes committed cost for AP, and what amount does it use?
+    answer_kind: definitive
+    reference_answer: >-
+      usp_JCCOInterface does this when a sub CO is posted (A -> I). It inserts JCCommit rows summed by phase
+      and cost type from item Amount, which is cost only with no markup or tax. It also adds CostAmt to
+      SLHdr.CurCost.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 55, end_line: 65}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 182, end_line: 195}
+    related_items: [BR-032]
+
+  - id: QA-06
+    audience: engineer
+    question: How are CO numbers generated, and is it safe under concurrent entry?
+    answer_kind: definitive
+    reference_answer: >-
+      usp_JCCONextNum returns MAX(CONum)+1 zero padded to 3 (001-999) under UPDLOCK/HOLDLOCK. The office
+      form calls it outside any transaction and then inserts on a separate connection, so the lock is
+      released in between. Two concurrent saves can get the same number, and the second fails on the
+      primary key ("Save failed"). The field import calls it inside its own transaction, so it is safe.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCONextNum.sql, start_line: 27, end_line: 37}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 236}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 76, end_line: 83}
+    related_items: [BR-001, EX-006]
+
+  - id: QA-07
+    audience: engineer
+    question: What happens if a user types 18% markup on the entry screen?
+    answer_kind: definitive
+    reference_answer: >-
+      The screen and BL accept it, since MAX_MARKUP_PCT is 20. On the first save, InsertHdr fails the
+      ckJCCOHdr_Mkup CHECK (0-15) and the user sees "Save failed: " plus the raw SQL error. If the CO
+      already existed, the new markup is not saved at all, because header fields are only written on
+      insert. The submit-time check (return 8) is never reached in practice.
+    locations:
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 47, end_line: 47}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 143, end_line: 151}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 114, end_line: 114}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 241}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 69, end_line: 74}
+    related_items: [BR-006, EX-007]
+
+  - id: QA-08
+    audience: engineer
+    question: How does the field import avoid creating duplicate change orders when the app retries?
+    answer_kind: definitive
+    reference_answer: >-
+      usp_JCCOFieldImport first looks up ExtRef. If it is found, it returns 1 with the existing CONum, and
+      ProcessRequest answers result DUPLICATE with that coNumber. A filtered unique index on JCCOHdr.ExtRef
+      backs this up. extRef must be a 36-char GUID.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 35, end_line: 40}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 119, end_line: 120}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 135, end_line: 141}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 222, end_line: 223}
+    related_items: [BR-033]
+
+  - id: QA-09
+    audience: engineer
+    question: Which checks does the "Save & Approve" button skip compared with the normal submit + approve path?
+    answer_kind: definitive
+    reference_answer: >-
+      All of the proc checks. It does a direct UPDATE Status='A' through SetStatus, so it skips: SoD (the
+      enterer approves), JCCOApprLim, sub open and insurance, the proc's sub CO cap (only the weaker BL
+      CurCost-based check runs), the notice period, the VAL deduct check at proc level, the server-side
+      recompute, and the 5% sub markup cap. Amounts stay as the screen preview, and SubmitDate stays null.
+      It is offered to any non-ENTRY role when the preview total is at most $2,500, which includes any
+      negative total.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 199, end_line: 207}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 169, end_line: 173}
+    related_items: [BR-026, BR-027, BR-028]
+
+  - id: QA-10
+    audience: engineer
+    question: How are database errors surfaced to the user?
+    answer_kind: definitive
+    reference_answer: >-
+      ExecProc catches SqlException and returns 99 with the raw message. The entry form shows "Database
+      error: <msg>" for 99. Direct SQL (ExecSql, InsertHdr, ReplaceItems) returns False and sets LastError.
+      Trigger violations RAISERROR at severity 11 and roll back.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 330, end_line: 353}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 260, end_line: 261}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 81, end_line: 83}
+    related_items: [EX-003]
+
+  - id: QA-11
+    audience: engineer
+    question: How is remaining subcontract CO capacity calculated, and does the screen match the approval check?
+    answer_kind: inconsistent
+    reference_answer: >-
+      The screens compute round(OrigCost * pct / 100, 2) - (CurCost - OrigCost), where pct is MaxCOPct or the
+      company default of 25%. This appears in clsJCCOBL.SubCapRemaining/CheckSubCap and in
+      frmJCSubcontractMaint.ShowCapacity. CurCost only grows when a CO is posted, so approved-but-unposted COs
+      are not counted. usp_JCCOApprove sums the CostAmt of S COs in A or I, so it can reject a CO the
+      screen says fits.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 180, end_line: 198}
+      - {file: ClientSide/JC/JC/frmJCSubcontractMaint.vb, start_line: 66, end_line: 77}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 129, end_line: 137}
+      - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 57, end_line: 58}
+    related_items: [BR-022]
+
+  - id: QA-12
+    audience: engineer
+    question: Is there any way to approve a CO above the approver's limit? How would you find out it happened?
+    answer_kind: definitive
+    reference_answer: >-
+      Yes, in three ways. (1) A JCAdmUsers member presses Ctrl+Shift+F12 on the approval screen; the title
+      gains a trailing period. The proc then skips the PM threshold and role limit checks and stamps
+      OvrFlag = 'Y', and the JCCOAudit note says 'override'. (2) Negative (deduct) COs pass every limit.
+      (3) Save & Approve skips the proc, but only for COs whose preview total is at most $2,500.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 61, end_line: 70}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 88, end_line: 107}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 68, end_line: 76}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 106, end_line: 106}
+    related_items: [BR-025, BR-028, BR-027]
+
+  # ===========================================================================
+  # PRODUCT TEAM (8) - plain business language
+  # ===========================================================================
+
+  - id: QA-13
+    audience: product
+    question: Can a project manager approve their own change order?
+    answer_kind: inconsistent
+    reference_answer: >-
+      Normally no. The approval step refuses an approver who entered the change. But there are two
+      exceptions. For small changes ($2,500 or less, or any credit), the person entering it can use the
+      one-step "Save & Approve" and approve it themselves. And for requests sent from the field app, the
+      system records the field app, not the person, as the one who entered it, so the requester is never
+      compared to the approver.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 82, end_line: 86}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+    related_items: [BR-011, BR-027]
+
+  - id: QA-14
+    audience: product
+    question: Who is allowed to approve a $300,000 change?
+    answer_kind: definitive
+    reference_answer: >-
+      A vice president (limit $1,000,000) or the CFO (effectively unlimited), and not the person who entered
+      it. Project managers stop at $50,000 and project executives at $250,000. A support-desk override also
+      exists that lets listed admin users approve without the limit.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 231, end_line: 235}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 95, end_line: 107}
+    related_items: [BR-010, BR-025]
+
+  - id: QA-15
+    audience: product
+    question: Can we still add a change to a job that has been soft-closed?
+    answer_kind: inconsistent
+    reference_answer: >-
+      It depends where it is entered. The office entry screen refuses changes on soft-closed and closed
+      jobs. Requests from the field app are accepted for soft-closed jobs, and the system's own submit and
+      posting steps only block fully closed jobs. The business needs to decide which rule is intended.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 114, end_line: 119}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 48, end_line: 52}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 55, end_line: 59}
+    related_items: [BR-019]
+
+  - id: QA-16
+    audience: product
+    question: Do owner changes on time-and-material jobs go through approval?
+    answer_kind: definitive
+    reference_answer: >-
+      No. On time-and-material jobs, owner changes are approved automatically by the system the moment they
+      are submitted, whatever the amount. The screen still tells the user "Submitted for approval". The
+      approved change order log marks them "(auto)".
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 122}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 256, end_line: 259}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 34, end_line: 34}
+    related_items: [BR-024]
+
+  - id: QA-17
+    audience: product
+    question: What markup can we charge on a subcontractor change?
+    answer_kind: inconsistent
+    reference_answer: >-
+      Users can enter up to 15%; the screen suggests up to 20%, but anything over 15% fails to save. When the
+      change is submitted, the system quietly limits the markup on subcontractor changes to 5% and gives no
+      message. The entry screen preview and the approved change order log still show the markup at the
+      entered rate.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 90}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 114, end_line: 114}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 31}
+    related_items: [BR-006, BR-007]
+
+  - id: QA-18
+    audience: product
+    question: How long after the work is requested do we have to submit a subcontractor change?
+    answer_kind: definitive
+    reference_answer: >-
+      21 calendar days from the request date. This is a company setting, and day 21 is still allowed. It is
+      only checked when the change is submitted, with no warning earlier. It does not apply to changes
+      approved with the one-step Save & Approve.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 100, end_line: 105}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 23, end_line: 23}
+    related_items: [BR-021, BR-027]
+
+  - id: QA-19
+    audience: product
+    question: Can an approved change be cancelled?
+    answer_kind: definitive
+    reference_answer: >-
+      Yes, it can be voided with a reason while it is approved but not yet posted to the contract. Two cases
+      are blocked: once posted, it needs a reversing change instead; and once it has been sent to the field
+      app, the void is refused even though the screen offers it.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 212, end_line: 223}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 51, end_line: 66}
+    related_items: [BR-015, BR-016]
+
+  - id: QA-20
+    audience: product
+    question: What is the biggest change request a field crew can send from the app?
+    answer_kind: definitive
+    reference_answer: >-
+      Up to $25,000 of cost before markup and tax (a company setting), with at most 20 lines. Anything larger
+      must be entered in the office. Field requests cannot be credits, and they cannot be internal changes.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 180, end_line: 212}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 74}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 22, end_line: 22}
+    related_items: [BR-033]
+
+  # ===========================================================================
+  # TRICK (5) - correct answer is "not determinable" or "it depends / inconsistent"
+  # ===========================================================================
+
+  - id: QA-21
+    audience: trick
+    question: Does the owner or the PM get an email when a change order is approved?
+    answer_kind: not_determinable
+    reference_answer: >-
+      Not determinable from the code. No notification or email code exists in the module. Approval only
+      updates JCCOHdr and writes JCCOAudit, and the field export is a batch push to the field service. Any
+      notifications would live outside this corpus.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 140, end_line: 145}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 68, end_line: 76}
+    related_items: []
+
+  - id: QA-22
+    audience: trick
+    question: Is a change order for exactly $50,000.00 within a PM's approval authority?
+    answer_kind: inconsistent
+    reference_answer: >-
+      It depends on the layer. The approval screen (BL >=) says no, and so does the field export flag. The
+      database proc (>) and the entry label and report (>) say yes. A PM is blocked in the UI, but a direct
+      proc call would succeed.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 144, end_line: 146}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 97, end_line: 101}
+    related_items: [BR-009]
+
+  - id: QA-23
+    audience: trick
+    question: What markup was charged on change order 005 for job 24-101?
+    answer_kind: not_determinable
+    reference_answer: >-
+      Not determinable. The seed data has no change order rows. Even with data, "markup" is ambiguous for sub
+      COs: stored MarkupPct is the entered rate, MarkupAmt may be capped at 5%, and report 615 recomputes
+      from MarkupPct.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 215, end_line: 262}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 90}
+    related_items: [BR-007]
+
+  - id: QA-24
+    audience: trick
+    question: How does the field app authenticate when it submits a change request?
+    answer_kind: not_determinable
+    reference_answer: >-
+      Not determinable. ProcessRequest takes a JSON string, but the hosting endpoint and the inbound
+      authentication are not in the corpus. The only credential shown is the outbound X-Api-Key, which the
+      ERP sends to the field service.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 3, end_line: 13}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 98, end_line: 104}
+    related_items: [EX-005]
+
+  - id: QA-25
+    audience: trick
+    question: After a field request arrives, who reviews it and submits it for approval?
+    answer_kind: not_determinable
+    reference_answer: >-
+      Not determinable. The request becomes a Draft with no submitter. The office entry screen only creates
+      new COs and cannot open an existing Draft, and nothing else calls usp_JCCOSubmit. The process (or
+      screen) that moves field drafts to Pending is not in the corpus.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 236}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 225, end_line: 230}
+    related_items: [EX-004]

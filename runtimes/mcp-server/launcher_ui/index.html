@@ -1,0 +1,1150 @@
+<!doctype html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!-- Launcher form + runs table on top of the JSON API in launcher_server.py
+     (docs/LAUNCHER_API.md). Plain HTML + vanilla JS, no build step.
+
+     Theme note: the header chrome and colour palette are duplicated from the output viewer
+     (runtimes/pipeline/generate-viewer-v3.py). The viewer is self-contained with inlined CSS and
+     is served from a different path space, so there is no shared stylesheet both can reference;
+     the tokens below are an intentional copy so the launcher and the viewer feel like one product.
+     Keep them in sync if the viewer theme changes. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spec Distillation launcher</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ── Theme tokens (duplicated from the output viewer; see header note) ─────────────────── */
+  :root {
+    --bg:#f8f9fa; --surface:#fff; --ink:#1a202c; --ink-soft:#2d3748; --muted:#6b7280;
+    --line:#e2e8f0; --line-soft:#edf1f5; --bar:#232f3e; --bar-2:#37475a; --panel-dark:#1e293b;
+    --accent:#ff9900; --accent-hover:#e08800; --accent-ink:#1a202c;
+    --ok:#22c55e; --ok-ink:#176c2f; --warn:#f59e0b; --warn-ink:#a65e00; --err:#ef4444; --err-ink:#a11;
+    --info:#2563eb; --info-soft:#f0f4ff;
+    --radius:8px; --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; color:var(--ink); background:var(--bg); margin:0;
+  }
+
+  /* ── Top bar (verbatim palette from the viewer) ────────────────────────────────────────── */
+  .top-bar {
+    height:48px; background:var(--bar); color:#fff; display:flex; align-items:center;
+    padding:0 24px; font-size:15px; font-weight:500; box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .top-bar .brand { color:var(--accent); font-weight:700; margin-right:8px; }
+  .top-bar .target { color:#a0aec0; font-weight:400; }
+  .compliance {
+    background:#fffbf0; border-bottom:1px solid var(--line); color:var(--warn-ink);
+    padding:7px 24px; font-size:12.5px; font-weight:500;
+  }
+
+  main { max-width:1120px; margin:0 auto; padding:24px 24px 48px; }
+  h1 { font-size:1.5rem; font-weight:700; color:var(--ink); margin:4px 0 20px; }
+  h2 { font-size:1.05rem; font-weight:600; color:var(--ink); margin:0 0 14px; }
+  h3 { font-size:.95rem; font-weight:600; color:var(--ink-soft); margin:0 0 8px; }
+
+  section {
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px 22px; margin-bottom:20px; box-shadow:var(--shadow);
+  }
+
+  label { display:block; margin:12px 0 4px; font-weight:600; color:var(--ink-soft); font-size:.9rem; }
+  label.inline { display:inline; font-weight:500; }
+  .optional { color:var(--muted); font-weight:400; }
+  input[type=text], input[type=number], select {
+    width:100%; padding:9px 11px; border:1px solid #cbd5e0; border-radius:6px;
+    font-size:.92rem; background:#fff; color:var(--ink);
+  }
+  input[type=text]:hover, input[type=number]:hover, select:hover { border-color:#9aa7b8; }
+  input:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible,
+  input[type=radio]:focus-visible, input[type=checkbox]:focus-visible {
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  .row { display:flex; gap:16px; } .row > div { flex:1; }
+  .hint { color:var(--muted); font-size:.78rem; margin-top:3px; }
+  fieldset { border:1px solid var(--line); border-radius:6px; margin:4px 0 8px; padding:12px 14px; }
+  legend { font-weight:600; color:var(--ink-soft); padding:0 6px; }
+
+  button {
+    padding:9px 18px; border-radius:6px; border:1px solid var(--accent); background:var(--accent);
+    color:var(--accent-ink); cursor:pointer; font-size:.9rem; font-weight:600;
+  }
+  button:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+  button.secondary { background:#fff; color:var(--ink-soft); border:1px solid #cbd5e0; }
+  button.secondary:hover { background:#f1f5f9; border-color:#9aa7b8; }
+  button.small { padding:4px 10px; font-size:.78rem; }
+  button:disabled { opacity:.5; cursor:default; }
+  a { color:var(--info); }
+
+  table { width:100%; border-collapse:collapse; font-size:.88rem; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { background:#f7fafc; font-weight:600; color:var(--ink-soft); border-bottom:1px solid var(--line); }
+  tbody tr:nth-child(even) { background:#f8fafc; }
+  td code { background:#f1f5f9; padding:1px 5px; border-radius:3px; font-size:.82em;
+            font-family:"SF Mono",Menlo,monospace; }
+
+  .msg { margin-top:10px; white-space:pre-wrap; }
+  .err { color:var(--err-ink); } .ok { color:var(--ok-ink); }
+  .callout { border-radius:6px; padding:12px 14px; margin:12px 0; font-size:.9rem; }
+  .callout.warn { background:#fffbf0; border:1px solid #f6d58a; color:var(--warn-ink); }
+
+  /* status pills */
+  .status { display:inline-block; }
+  .pill { display:inline-block; padding:2px 9px; border-radius:999px; font-size:.76rem; font-weight:600; }
+  .s-complete .pill { background:#e8f6ee; color:var(--ok-ink); }
+  .s-failed .pill, .s-cancelled .pill, .s-interrupted .pill { background:#fdeaea; color:var(--err-ink); }
+  .s-budget_exhausted .pill, .s-over_estimate .pill { background:#fff4e0; color:var(--warn-ink); }
+  .s-running .pill, .s-queued .pill, .s-estimating .pill, .s-estimated .pill { background:#eaf1fb; color:#1d4ed8; }
+
+  pre { background:#11151c; color:#d7dde6; padding:12px 14px; border-radius:6px;
+        max-height:320px; overflow:auto; font-size:12px; line-height:1.5; }
+  code { font-size:12px; }
+
+  /* ── Phase stepper ─────────────────────────────────────────────────────────────────────── */
+  .stepper { list-style:none; margin:0 0 14px; padding:0; display:flex; flex-wrap:wrap; gap:6px 4px; }
+  .stepper li {
+    display:flex; align-items:center; gap:7px; padding:6px 10px; border-radius:6px;
+    font-size:.82rem; color:var(--muted); background:#f3f5f8; border:1px solid var(--line-soft);
+  }
+  .stepper .marker {
+    width:18px; height:18px; border-radius:999px; display:inline-flex; align-items:center;
+    justify-content:center; font-size:11px; font-weight:700; flex:none;
+    background:#dfe4ea; color:#fff;
+  }
+  .stepper li.done { color:var(--ok-ink); background:#eef9f1; border-color:#cdecd6; }
+  .stepper li.done .marker { background:var(--ok); }
+  .stepper li.current { color:var(--ink); background:#fff7e9; border-color:#f6d58a; font-weight:600; }
+  .stepper li.current .marker { background:var(--accent); color:var(--accent-ink); }
+  .stepper li.failed { color:var(--err-ink); background:#fdeaea; border-color:#f3c2c2; font-weight:600; }
+  .stepper li.failed .marker { background:var(--err); }
+  .step-sub { color:var(--muted); font-size:.82rem; margin:0 0 10px; }
+  .step-sub b { color:var(--ink-soft); }
+
+  /* ── Indeterminate progress bar (honest, no fake %) ────────────────────────────────────── */
+  .bar { height:8px; border-radius:999px; background:var(--line); overflow:hidden; position:relative; margin:4px 0 12px; }
+  .bar .fill { position:absolute; top:0; bottom:0; width:40%; border-radius:999px; background:var(--accent); }
+  .bar.indeterminate .fill { animation:slide 1.3s ease-in-out infinite; }
+  .bar.done .fill { width:100%; background:var(--ok); }
+  .bar.failed .fill { width:100%; background:var(--err); }
+  @keyframes slide { 0% { left:-40%; } 50% { left:60%; } 100% { left:100%; } }
+  @media (prefers-reduced-motion: reduce) {
+    .bar.indeterminate .fill { animation:none; left:0; width:100%; opacity:.5; }
+  }
+
+  .tokens { color:var(--muted); font-size:.82rem; margin:8px 0; }
+  .artifacts { margin:10px 0; font-size:.84rem; }
+  .artifacts a { margin-right:4px; }
+  .empty { color:var(--muted); text-align:center; padding:22px 10px; }
+
+  /* ── Inline per-row detail (renders directly beneath its own run row) ──────────────────── */
+  tbody tr.run-row td a[data-open] { cursor:pointer; }
+  /* keep zebra striping readable: a detail row is visually tied to the run above it */
+  tbody tr.detail-row > td {
+    background:#f1f5f9; border-left:3px solid var(--accent); padding:16px 18px 18px 20px;
+  }
+  tbody tr.detail-row .detail-title { font-size:1rem; font-weight:600; color:var(--ink); margin:0 0 10px; }
+  tbody tr.detail-row pre { margin:6px 0 0; }
+  tbody tr.detail-row table { width:auto; }
+  /* Keep the detail cell from forcing the whole runs table wider than its container: the cell is
+     clamped to the viewport and its contents (stepper, cost table, log) wrap or scroll inside it. */
+  tbody tr.detail-row > td { max-width:0; }
+  tbody tr.detail-row > td > * { max-width:100%; box-sizing:border-box; }
+  tbody tr.detail-row > td > [data-field="cost"] { overflow-x:auto; }
+
+  /* ── Cost breakdown (glanceable, shown on Estimate and in a run's inline detail) ────────── */
+  .cost { margin:4px 0 2px; }
+  .cost .cost-label { color:var(--muted); font-size:.82rem; margin:0 0 8px; }
+  table.cost-table { width:auto; min-width:360px; }
+  table.cost-table td.num, table.cost-table th.num { text-align:right; white-space:nowrap; }
+  table.cost-table td.driver { color:var(--muted); font-size:.82rem; }
+  /* Collapsible cost breakdown in a run's inline detail — matches the per-still detail disclosure
+     (same default summary size/weight); the inner label is hidden since the summary carries total. */
+  details.cost-detail { margin-top:6px; }
+  details.cost-detail > summary { cursor:pointer; }
+  details.cost-detail .cost-label { display:none; }
+  table.cost-table tr.total td { border-top:2px solid var(--line); font-weight:700; color:var(--ink); }
+  table.cost-table tr.total td.driver { font-weight:400; }
+
+  /* ── Evaluation (inside the inline run detail; the full scorecard is the viewer's Evaluation tab) */
+  .eval-panel { margin:14px 0 4px; padding-top:10px; border-top:1px solid var(--line); }
+  .eval-legend { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 8px; }
+  .eval-chip { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.76rem; font-weight:600; }
+  .eval-chip.exact { background:#effaf8; color:#0f766e; border:1px solid #99d6cc; }
+  .eval-chip.est { background:#f6f3ff; color:#6d28d9; border:1px dashed #b9a2f0; }
+  .eval-cards { display:flex; flex-wrap:wrap; gap:12px; margin:8px 0; }
+  .eval-card { flex:1; min-width:260px; background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:.84rem; }
+  .eval-card.exact { border-left:4px solid #0f766e; }
+  .eval-card.est { border-left:4px dashed #6d28d9; }
+  .eval-card h4 { margin:0 0 4px; font-size:.84rem; }
+  .eval-card.exact h4 { color:#0f766e; } .eval-card.est h4 { color:#6d28d9; }
+  .eval-card .ci { color:var(--muted); font-size:.78rem; }
+  .eval-nm { color:var(--muted); font-style:italic; }
+  .eval-form .row > div { min-width:140px; }
+  .eval-form select { width:100%; padding:8px 10px; border:1px solid #cbd5e0; border-radius:6px; font-size:.9rem; background:#fff; }
+  .eval-choices { display:flex; flex-wrap:wrap; gap:16px; margin:6px 0 4px; }
+  .eval-choice { flex:1; min-width:260px; } .eval-choice .hint { margin-top:6px; }
+  .eval-advanced { margin-top:12px; } .eval-advanced summary { cursor:pointer; color:var(--muted); font-size:.84rem; }
+  .eval-actions { margin:10px 0 0; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .ground { margin:6px 0; font-size:.9rem; } .ground.ok { color:var(--ok-ink); } .ground.warn { color:var(--warn-ink); }
+  .ground a, .score-flow a { font-size:.84rem; }
+  .score-flow { margin:8px 0; } .score-steps { margin:6px 0 10px; }
+  .score-result { margin:6px 0; }
+  .spin { display:inline-block; width:.8em; height:.8em; margin-right:6px; border:2px solid #cbd5e0; border-top-color:#64748b; border-radius:50%; animation:spin 1s linear infinite; vertical-align:-1px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .s-planning .pill, .s-planned .pill { background:#eaf1fb; color:#1d4ed8; }
+  .s-over_budget .pill, .s-budget_exceeded .pill { background:#fff4e0; color:var(--warn-ink); }
+  .s-idle .pill { background:#eef0f3; color:#4b5563; }
+  /* Test data set (built from the code and its tests; reviewed by a person) */
+  .s-building .pill { background:#eaf1fb; color:#1d4ed8; } .s-ready .pill { background:#e8f6ee; color:var(--ok-ink); }
+  .ds-bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:6px 0; }
+  .ds-bar select, .ds-bar input { padding:6px 8px; border:1px solid #cbd5e0; border-radius:6px; font-size:.86rem; background:#fff; }
+  .ds-item { background:var(--surface); border:1px solid var(--line); border-radius:6px; padding:8px 12px; margin:8px 0; font-size:.86rem; }
+  .ds-item.approved, .ds-item.edited { border-left:4px solid #2e7d32; } .ds-item.rejected { border-left:4px solid #b3261e; opacity:.8; }
+  .ds-item .from { color:var(--muted); font-size:.78rem; }
+  .ds-item pre { margin:6px 0; font-size:.76rem; white-space:pre; overflow:auto; }
+  .ds-item pre .hl { background:#fff4c2; display:block; } .ds-item pre .ln { color:#8a94a3; display:inline-block; width:4em; user-select:none; }
+  .ds-item textarea { width:100%; min-height:48px; box-sizing:border-box; font:inherit; }
+  .ds-tag { display:inline-block; padding:1px 8px; border-radius:999px; font-size:.72rem; background:#e3f1e4; color:#1e5b22; margin-left:6px; }
+  table.compare-table td.num { text-align:right; white-space:nowrap; }
+</style>
+</head>
+<body>
+<header class="top-bar"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none" style="height:20px;width:auto;margin-right:10px;vertical-align:middle" role="img" aria-label="AWS"><path fill="#ffffff" d="M4.51 7.687c0 .197.02.357.058.475.042.117.096.245.17.384a.233.233 0 01.037.123c0 .053-.032.107-.1.16l-.336.224a.255.255 0 01-.138.048c-.054 0-.107-.026-.16-.074a1.652 1.652 0 01-.192-.251 4.137 4.137 0 01-.165-.315c-.415.491-.936.737-1.564.737-.447 0-.804-.129-1.064-.385-.261-.256-.394-.598-.394-1.025 0-.454.16-.822.484-1.1.325-.278.756-.416 1.304-.416.18 0 .367.016.564.042.197.027.4.07.612.118v-.39c0-.406-.085-.689-.25-.854-.17-.166-.458-.246-.868-.246-.186 0-.377.022-.574.07a4.23 4.23 0 00-.575.181 1.525 1.525 0 01-.186.07.326.326 0 01-.085.016c-.075 0-.112-.054-.112-.166v-.262c0-.085.01-.15.037-.186a.399.399 0 01.15-.113c.185-.096.409-.176.67-.24.26-.07.537-.101.83-.101.633 0 1.096.144 1.394.432.293.288.442.726.442 1.314v1.73h.01zm-2.161.811c.175 0 .356-.032.548-.096.191-.064.362-.182.505-.342a.848.848 0 00.181-.341c.032-.129.054-.283.054-.465V7.03a4.43 4.43 0 00-.49-.09 3.996 3.996 0 00-.5-.033c-.357 0-.618.07-.793.214-.176.144-.26.347-.26.614 0 .25.063.437.196.566.128.133.314.197.559.197zm4.273.577c-.096 0-.16-.016-.202-.054-.043-.032-.08-.106-.112-.208l-1.25-4.127a.938.938 0 01-.049-.214c0-.085.043-.133.128-.133h.522c.1 0 .17.016.207.053.043.032.075.107.107.208l.894 3.535.83-3.535c.026-.106.058-.176.1-.208a.365.365 0 01.214-.053h.425c.102 0 .17.016.213.053.043.032.08.107.101.208l.841 3.578.92-3.578a.458.458 0 01.107-.208.346.346 0 01.208-.053h.495c.085 0 .133.043.133.133 0 .027-.006.054-.01.086a.76.76 0 01-.038.133l-1.283 4.127c-.032.107-.069.177-.111.209a.34.34 0 01-.203.053h-.457c-.101 0-.17-.016-.213-.053-.043-.038-.08-.107-.101-.214L8.213 5.37l-.82 3.439c-.026.107-.058.176-.1.213-.043.038-.118.054-.213.054h-.458zm6.838.144a3.51 3.51 0 01-.82-.096c-.266-.064-.473-.134-.612-.214-.085-.048-.143-.101-.165-.15a.378.378 0 01-.031-.149v-.272c0-.112.042-.166.122-.166a.3.3 0 01.096.016c.032.011.08.032.133.054.18.08.378.144.585.187.213.042.42.064.633.064.336 0 .596-.059.777-.176a.575.575 0 00.277-.508.52.52 0 00-.144-.373c-.095-.102-.276-.193-.537-.278l-.772-.24c-.388-.123-.676-.305-.851-.545a1.275 1.275 0 01-.266-.774c0-.224.048-.422.143-.593.096-.17.224-.32.384-.438.16-.122.34-.213.553-.277.213-.064.436-.091.67-.091.118 0 .24.005.357.021.122.016.234.038.346.06.106.026.208.052.303.085.096.032.17.064.224.096a.46.46 0 01.16.133.289.289 0 01.047.176v.251c0 .112-.042.171-.122.171a.552.552 0 01-.202-.064 2.427 2.427 0 00-1.022-.208c-.303 0-.543.048-.708.15-.165.1-.25.256-.25.475 0 .149.053.277.16.379.106.101.303.202.585.293l.756.24c.383.123.66.294.825.513.165.219.244.47.244.748 0 .23-.047.437-.138.619a1.436 1.436 0 01-.388.47c-.165.133-.362.23-.591.299-.24.075-.49.112-.761.112z"/><g fill="#F90" fill-rule="evenodd" clip-rule="evenodd"><path d="M14.465 11.813c-1.75 1.297-4.294 1.986-6.481 1.986-3.065 0-5.827-1.137-7.913-3.027-.165-.15-.016-.353.18-.235 2.257 1.313 5.04 2.109 7.92 2.109 1.941 0 4.075-.406 6.039-1.239.293-.133.543.192.255.406z"/><path d="M15.194 10.98c-.223-.287-1.479-.138-2.048-.069-.17.022-.197-.128-.043-.24 1-.705 2.645-.502 2.836-.267.192.24-.053 1.89-.99 2.68-.143.123-.281.06-.218-.1.213-.53.687-1.72.463-2.003z"/></g></svg><span class="brand">Spec Distillation</span><span class="target">&mdash; Launcher</span></header>
+<div class="compliance">Synthetic or approved non-production code only. Runs use this machine's AWS profile; never enter credentials here.</div>
+<main>
+<h1>Spec Distillation launcher</h1>
+
+<section aria-labelledby="newRunTitle">
+  <h2 id="newRunTitle">New run</h2>
+  <form id="f" autocomplete="off">
+    <fieldset>
+      <legend>Source</legend>
+      <label class="inline"><input type="radio" name="stype" value="git" checked> Git repository</label>
+      &nbsp;&nbsp;
+      <label class="inline"><input type="radio" name="stype" value="path"> Local folder</label>
+      <div id="git">
+        <label for="url">Repository URL</label>
+        <input type="text" id="url" placeholder="git@host:org/repo.git, https://host/org/repo.git or file:///path/repo">
+        <div class="hint">No credentials in the URL: use your SSH key (ssh-agent) or a git credential helper.</div>
+        <div class="row">
+          <div><label for="ref">Branch, tag or commit <span class="optional">(optional)</span></label><input type="text" id="ref" placeholder="remote HEAD"></div>
+          <div><label for="subdir">Subfolder <span class="optional">(optional)</span></label><input type="text" id="subdir" placeholder="e.g. samples/ap-invoices"></div>
+        </div>
+      </div>
+      <div id="path" hidden>
+        <label for="lpath">Absolute path on this machine</label>
+        <input type="text" id="lpath" placeholder="/tmp/ap-src">
+      </div>
+    </fieldset>
+    <details>
+      <summary>Options</summary>
+      <label for="model">Model</label>
+      <select id="model">
+        <option value="anthropic.claude-opus-5-5">Claude Opus 5.5 — highest quality (slower, higher cost)</option>
+        <option value="us.anthropic.claude-sonnet-4-6">Claude Sonnet 4.6 — fast, balanced (recommended)</option>
+        <option value="anthropic.claude-haiku-4-5-20251001-v1:0">Claude Haiku 4.5 — fastest, lowest cost (quick tests)</option>
+      </select>
+      <div class="hint">Opus is highest quality but slower and ~5x the cost of Sonnet; Sonnet is recommended for most runs.</div>
+      <label for="stills">Stills <span class="optional">(optional, space separated; default all)</span></label><input type="text" id="stills">
+      <div class="hint" id="stillsHint"></div>
+      <label class="inline"><input type="checkbox" id="facts" checked> Parser facts</label><br>
+      <label class="inline"><input type="checkbox" id="issues" checked> Issues &amp; Insights report</label>
+    </details>
+    <p><button type="submit" id="estBtn">Estimate cost</button>
+       <span class="hint">Clones/enumerates and prices the run. No model call. The run id is generated from the repo/folder name plus a timestamp.</span></p>
+  </form>
+  <div id="estimate" hidden>
+    <div id="estCost"></div>
+    <p><button id="startBtn">Start run</button> <button class="secondary" id="discardBtn">Discard</button></p>
+  </div>
+  <div id="formMsg" class="msg"></div>
+</section>
+
+<section aria-labelledby="runsTitle">
+  <h2 id="runsTitle">Runs</h2>
+  <table>
+    <thead><tr>
+      <th scope="col">Run</th><th scope="col">Source</th><th scope="col">Status</th>
+      <th scope="col">Step</th><th scope="col">Spent / est.</th><th scope="col"><span class="hint">Action</span></th>
+    </tr></thead>
+    <tbody id="runs"><tr><td colspan="6" class="hint">Loading…</td></tr></tbody>
+  </table>
+</section>
+
+<section aria-labelledby="compareTitle">
+  <h2 id="compareTitle">Compare evaluations</h2>
+  <p class="hint">Two runs side by side (for example AP vs JC, or before vs after a fix). Exact differences are real; an estimated difference inside the 95% CI or the measured judge-noise band is flagged as within noise.</p>
+  <div class="row">
+    <div><label for="cmpA">Run A</label><select id="cmpA" class="cmp-select"></select></div>
+    <div><label for="cmpB">Run B</label><select id="cmpB" class="cmp-select"></select></div>
+  </div>
+  <p><button class="secondary" id="cmpBtn">Compare</button></p>
+  <div id="cmpOut"></div>
+</section>
+</main>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let pending = null;
+// Expanded run detail rows, tracked by run id so a 4 s poll never collapses what the user (or the
+// auto-expand of a running run) opened. `userTouched` records ids the user explicitly toggled so we
+// don't re-auto-expand a running run they chose to collapse.
+const expanded = new Set();
+const userTouched = new Set();
+
+async function api(method, path, body) {
+  const opt = { method, headers: {} };
+  if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  const r = await fetch(path, opt);
+  let data = {};
+  try { data = await r.json(); } catch (e) { data = { error: "HTTP " + r.status }; }
+  return { status: r.status, data };
+}
+const usd = (v) => (v === null || v === undefined) ? "–" : "$" + Number(v).toFixed(2);
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+// ── Cost breakdown ───────────────────────────────────────────────────────────────────────────
+// Friendly, non-technical names + a one-line plain-English driver for each pipeline stage. Keeps
+// the panel glanceable: no model names, no raw unit math, no estimate-vs-actual columns.
+const COST_PHASES = {
+  map:             { name: "Extraction",            driver: (e) => `${(e.stills || []).length} analyses × ${e.pages ?? "?"} page(s)` },
+  reduce:          { name: "Reduce & de-duplicate", driver: () => "one pass per analysis" },
+  synthesis:       { name: "Concept synthesis",     driver: () => "merge findings into concepts" },
+  format:          { name: "Formatting",            driver: () => "tidy the extracted sections" },
+  code_graph:      { name: "Code dependency graph", driver: () => "map how the code connects" },
+  arbitrate:       { name: "Conflict arbitration",  driver: () => "resolve disagreements" },
+  backmap_residue: { name: "Source back-mapping",   driver: () => "tie concepts back to source" },
+  issues:          { name: "Issue detection",       driver: () => "flag gaps and risks" },
+  blend:           { name: "Master blend",          driver: () => "combine into one draft" },
+  bottling:        { name: "Specification bottling", driver: () => "produce the final spec" },
+};
+
+// Renders the per-phase cost table (largest cost first) + a bold total, from a run's estimate
+// object. Returns "" when there is no per-stage data yet, so callers can omit the panel cleanly.
+function costBreakdownHtml(est) {
+  est = est || {};
+  const byStage = est.full_usd_by_stage || {};
+  const rows = Object.keys(COST_PHASES)
+    .map((k) => [k, Number(byStage[k])])
+    .filter(([, v]) => Number.isFinite(v) && v > 0)
+    .sort((a, b) => b[1] - a[1]);                 // largest contributor first — the "why" story
+  if (!rows.length) return "";
+  const body = rows.map(([k, v]) => {
+    const p = COST_PHASES[k];
+    return `<tr><td>${esc(p.name)}</td><td class="driver">${esc(p.driver(est))}</td>` +
+           `<td class="num">${usd(v)}</td></tr>`;
+  }).join("");
+  const total = (est.estimate_usd !== null && est.estimate_usd !== undefined)
+    ? est.estimate_usd
+    : rows.reduce((a, [, v]) => a + v, 0);
+  return `<div class="cost">` +
+    `<p class="cost-label">Estimated cost — what each step of the pipeline costs for this run.</p>` +
+    `<table class="cost-table"><thead><tr>` +
+      `<th scope="col">Phase</th><th scope="col">What it does</th><th scope="col" class="num">Cost</th>` +
+    `</tr></thead><tbody>${body}` +
+    `<tr class="total"><td>Total</td><td class="driver"></td><td class="num">${usd(total)}</td></tr>` +
+    `</tbody></table></div>`;
+}
+
+document.querySelectorAll("input[name=stype]").forEach((r) => r.addEventListener("change", () => {
+  const git = document.querySelector("input[name=stype]:checked").value === "git";
+  $("git").hidden = !git; $("path").hidden = git;
+}));
+
+function requestBody() {
+  const git = document.querySelector("input[name=stype]:checked").value === "git";
+  const source = git ? { type: "git", url: $("url").value.trim() } : { type: "path", path: $("lpath").value.trim() };
+  if (git && $("ref").value.trim()) source.ref = $("ref").value.trim();
+  if (git && $("subdir").value.trim()) source.subdir = $("subdir").value.trim();
+  // No run-name field: the server derives the id from the source + timestamp.
+  // No budget-cap field: runs from the UI are uncapped (max_usd is not sent).
+  const body = { source, facts: $("facts").checked, issues: $("issues").checked };
+  if ($("model").value) body.model_id = $("model").value;
+  if ($("stills").value.trim()) body.stills = $("stills").value.trim().split(/[\s,]+/);
+  return body;
+}
+
+$("f").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("formMsg").textContent = "Estimating (cloning and paging the source)…"; $("formMsg").className = "msg";
+  $("estimate").hidden = true; $("estBtn").disabled = true;
+  try {
+    const { status, data } = await api("POST", "/api/runs", { ...requestBody(), estimate_only: true });
+    if (status === 200) {
+      pending = data.run_id;
+      const e = data.estimate || {};
+      // The per-phase breakdown is the "why it costs what it does" story at the money-decision moment.
+      $("estCost").innerHTML = costBreakdownHtml({ ...e, estimate_usd: data.estimate_usd });
+      $("estimate").hidden = false; $("formMsg").textContent = "";
+    } else {
+      $("estCost").innerHTML = "";
+      $("formMsg").className = "msg err";
+      $("formMsg").textContent = `${status}: ${data.error || "error"}` + (data.suggested_max_usd ? `\nSuggested cap: ${usd(data.suggested_max_usd)}` : "");
+    }
+  } finally { $("estBtn").disabled = false; refresh(); }
+});
+
+$("startBtn").addEventListener("click", async () => {
+  if (!pending) return;
+  const { status, data } = await api("POST", `/api/runs/${pending}/start`);
+  $("formMsg").className = status === 202 ? "msg ok" : "msg err";
+  $("formMsg").textContent = status === 202 ? `Started ${data.run_id} (${data.status}).` : `${status}: ${data.error}`;
+  $("estimate").hidden = true; $("estCost").innerHTML = ""; pending = null; refresh();
+});
+$("discardBtn").addEventListener("click", async () => {
+  if (pending) await api("POST", `/api/runs/${pending}/cancel`);
+  $("estimate").hidden = true; $("estCost").innerHTML = ""; pending = null; refresh();
+});
+
+// Full artifact map, now shown in the detail panel (the table no longer has an Outputs column).
+const ARTIFACT_NAMES = { issues_md: "issues", bottled_spec: "spec", bottled_summary: "summary",
+  knowledge_graph_index: "graph", viewer: "viewer", run_status: "status",
+  budget_estimate: "estimate", source_provenance: "provenance" };
+function artifactLinks(links) {
+  links = links || {};
+  return Object.entries(ARTIFACT_NAMES).filter(([k]) => links[k])
+    .map(([k, n]) => `<a href="${esc(links[k])}" target="_blank" rel="noopener">${n}</a>`).join(" · ");
+}
+
+async function refresh() {
+  const { status, data } = await api("GET", "/api/runs");
+  if (status !== 200) return;
+  const runs = data.runs || [];
+  const liveIds = new Set(runs.map((r) => r.run_id));
+  // Drop state for runs that no longer exist so the sets don't grow unbounded.
+  for (const id of [...expanded]) if (!liveIds.has(id)) expanded.delete(id);
+  for (const id of [...userTouched]) if (!liveIds.has(id)) userTouched.delete(id);
+  // Auto-expand a running run's detail by default so the active run's stepper is visible without a
+  // click — unless the user explicitly collapsed it this session.
+  for (const r of runs) if (r.status === "running" && !userTouched.has(r.run_id)) expanded.add(r.run_id);
+
+  const rows = runs.map((r) => {
+    const s = r.source || {};
+    const src = s.type === "git"
+      ? `${esc(s.url)}${s.subdir ? " / " + esc(s.subdir) : ""}${s.commit ? "<br><code>" + esc(s.commit.slice(0, 12)) + "</code>" : ""}`
+      : esc(s.path);
+    const cancel = ["running", "queued", "estimated"].includes(r.status)
+      ? `<button class="secondary small" data-cancel="${esc(r.run_id)}">Cancel</button>` : "";
+    // Open viewer (with chat) is the one primary way into a finished run — the launcher serves the
+    // viewer and answers its per-run /api/* calls.
+    const viewer = (r.links && r.links.viewer)
+      ? `<a href="${esc(r.links.viewer)}" target="_blank" rel="noopener"><b>Open viewer</b></a>` : "";
+    // Evaluate: opens this run's inline detail at its Evaluation panel (plan → confirm, or smoke).
+    const evaluate = canEvaluate(r)
+      ? `<button class="secondary small" data-eval="${esc(r.run_id)}">Evaluate</button>` : "";
+    const act = [viewer, evaluate, cancel].filter(Boolean).join(" ");
+    const id = r.run_id, open = expanded.has(id);
+    const runRow = `<tr class="run-row"><td><a href="#" data-open="${esc(id)}" role="button" aria-expanded="${open}">${esc(id)}</a></td><td>${src}</td>` +
+      `<td class="status s-${esc(r.status)}"><span class="pill">${esc(r.status)}</span>${r.error ? "<br><span class='hint'>" + esc(r.error) + "</span>" : ""}</td>` +
+      `<td>${esc(phaseToStep(r.phase))}</td><td>${usd(r.spent_usd)} / ${usd(r.estimate_usd)}</td>` +
+      `<td>${act}</td></tr>`;
+    // The inline detail cell: same stepper + per-still + source + artifacts + log tail that used to
+    // live in the bottom #detail div, now injected right under the row it describes.
+    const detailRow = open
+      ? `<tr class="detail-row" data-detail="${esc(id)}"><td colspan="6">` +
+          `<div class="detail-title" data-field="title"></div>` +
+          `<div class="msg" data-field="progress"></div>` +
+          `<div data-field="cost"></div>` +
+          `<div class="artifacts" data-field="artifacts"></div>` +
+          `<div data-field="eval"></div>` +
+          `<h3>Recent log</h3><pre data-field="logTail"></pre>` +
+          `<div class="msg" data-field="resume"></div>` +
+        `</td></tr>`
+      : "";
+    return runRow + detailRow;
+  });
+  // Don't rebuild the table under someone typing a budget or choosing a suite (the eval panels
+  // themselves survive a rebuild: they are persistent nodes re-attached below).
+  if (document.activeElement && document.activeElement.closest && document.activeElement.closest(".eval-panel, .ds-panel")) return;
+  // Keep what the viewer is looking at across the periodic rebuild: open/closed sections, the page
+  // scroll position and the log's scroll position. Without this every 10 s tick collapsed the
+  // section on screen (demo-breaking while a run is in progress).
+  const keep = captureViewState();
+  const html = rows.join("") ||
+    `<tr><td colspan="6"><div class="empty">No runs yet. Estimate a run above to get started.</div></td></tr>`;
+  if (html !== lastRunsHtml) { $("runs").innerHTML = html; lastRunsHtml = html; }
+  // Populate every currently-expanded run's detail cell, then restore the view.
+  await Promise.all([...expanded].filter((id) => liveIds.has(id)).map((id) => Promise.resolve(showDetail(id)).catch(() => {})));
+  restoreViewState(keep);
+  fillCompareSelects(runs);
+}
+
+let lastRunsHtml = "";
+// A <details> is identified by its run and the stable start of its summary text (counts and dollar
+// amounts in the summary change between ticks, so digits are dropped from the key).
+function detailsKey(d) {
+  const row = d.closest("tr.detail-row");
+  const sum = d.querySelector(":scope > summary");
+  const label = (sum ? sum.textContent : "").replace(/[\d$.,—–()-]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+  return (row ? row.dataset.detail : "") + "|" + label;
+}
+function captureViewState() {
+  const open = new Set(), closed = new Set();
+  document.querySelectorAll("#runs details").forEach((d) => (d.open ? open : closed).add(detailsKey(d)));
+  const logs = {};
+  document.querySelectorAll("#runs tr.detail-row").forEach((r) => {
+    const pre = r.querySelector('[data-field="logTail"]');
+    if (pre) logs[r.dataset.detail] = { top: pre.scrollTop, atBottom: pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4 };
+  });
+  return { open, closed, logs, x: window.scrollX, y: window.scrollY };
+}
+function restoreViewState(k) {
+  if (!k) return;
+  document.querySelectorAll("#runs details").forEach((d) => {
+    const key = detailsKey(d);
+    if (k.open.has(key)) d.open = true; else if (k.closed.has(key)) d.open = false;
+  });
+  document.querySelectorAll("#runs tr.detail-row").forEach((r) => {
+    const pre = r.querySelector('[data-field="logTail"]'), st = k.logs[r.dataset.detail];
+    if (pre && st) pre.scrollTop = st.atBottom ? pre.scrollHeight : st.top;
+  });
+  try { window.scrollTo(k.x, k.y); } catch (e) { /* not supported (e.g. test DOM) */ }
+}
+
+$("runs").addEventListener("click", async (ev) => {
+  const ev2 = ev.target.closest("[data-eval]");
+  if (ev2) {
+    const id = ev2.dataset.eval;
+    userTouched.add(id); expanded.add(id);
+    await refresh();
+    const panel = evalPanels.get(id);
+    if (panel) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+  const c = ev.target.closest("[data-cancel]"), o = ev.target.closest("[data-open]");
+  if (c) { if (confirm("Cancel " + c.dataset.cancel + "?")) { await api("POST", `/api/runs/${c.dataset.cancel}/cancel`); refresh(); } }
+  if (o) {
+    ev.preventDefault();
+    const id = o.dataset.open;
+    userTouched.add(id);
+    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+    refresh();
+  }
+});
+
+// ── Phase stepper ──────────────────────────────────────────────────────────────────────────
+// The canonical 8 steps, in order. Each step's "complete" is derived purely from the monotonic
+// on-disk facts in /progress; the run's `phase` string is only a set-membership hint for the
+// current step's sub-line (never an ordered comparison). Labels/detectors match design §2.
+const REDUCED = new Set(["reduce_complete", "knowledge_complete", "formatting", "formatted"]);
+const STEPS = [
+  { label: "Scan source",           hint: new Set(["Phase 0", "Phase 0.5", "Phase 0b", "Phase 0c"]),
+    done: (p) => (p.source && p.source.files > 0) },
+  { label: "Prepare pages",         hint: new Set(["Phase 1", "Phase 1.1"]),
+    done: (p) => ph(p).pages && ph(p).pages.status === "complete" },
+  { label: "Estimate cost",         hint: new Set(["Phase 1.5", "Phase 1.6", "Phase 1.7", "Phase 1.2", "Phase 1.3"]),
+    done: (p) => stillList(p).length > 0 && stillList(p).some((s) => s.phase && s.phase !== "queued") },
+  { label: "Extract knowledge",     hint: new Set(["Phase 2"]),
+    done: (p) => stillList(p).length > 0 && stillList(p).every((s) => REDUCED.has(s.phase)) },
+  { label: "Build knowledge graph", hint: new Set(["Phase 2.5", "Phase 2.6", "Phase 2.75", "Phase 2.8", "Phase 2.9", "Phase 2.95", "Phase 2.97", "Phase 2.98"]),
+    done: (p) => ph(p).reconciliation === "complete" || (stillList(p).length > 0 && stillList(p).every((s) => s.phase === "formatted")) },
+  { label: "Synthesize spec",       hint: new Set(["Phase 3", "Phase 4"]),
+    done: (p) => ph(p).master_blend === "complete" },
+  { label: "Finalize deliverable",  hint: new Set(["Phase 5"]),
+    done: (p) => ph(p).bottled === "complete" },
+  { label: "Generate viewer",       hint: new Set(["Phase 6"]),
+    done: (p) => ph(p).viewer === "complete" },
+];
+
+// Translate a raw backend phase string ("Phase 2", "Phase 1.7", "2.75", "0c", "Phase 2->2.5", the
+// "done" sentinel, …) into one of the 8 friendly STEP labels above. The backend reports these
+// markers from run_distillation.sh; users must never see the bare number. Unrecognized → "" so the
+// caller shows a neutral/empty label rather than leaking a raw phase. Match by the numeric/prefix
+// token (first "N[.N][letter]" found), robust to the "Phase " prefix being present or absent.
+const PHASE_STEP = {
+  "0": "Scan source", "0.5": "Scan source", "0b": "Scan source", "0c": "Scan source",
+  "1": "Prepare pages", "1.1": "Prepare pages", "1.2": "Prepare pages", "1.3": "Prepare pages",
+  "1.5": "Prepare pages",
+  "1.6": "Estimate cost", "1.7": "Estimate cost",
+  "2": "Extract knowledge",
+  "2.5": "Build knowledge graph", "2.6": "Build knowledge graph", "2.75": "Build knowledge graph",
+  "2.8": "Build knowledge graph", "2.9": "Build knowledge graph", "2.95": "Build knowledge graph",
+  "2.97": "Build knowledge graph", "2.98": "Build knowledge graph",
+  "3": "Synthesize spec", "4": "Synthesize spec",
+  "5": "Finalize deliverable",
+  "6": "Generate viewer", "6.5": "Generate viewer",
+};
+function phaseToStep(raw) {
+  if (raw === null || raw === undefined) return "";
+  const s = String(raw).trim();
+  if (!s) return "";
+  if (s === "done" || s === "complete") return "Generate viewer";
+  if (/estimate/i.test(s)) return "Estimate cost";       // over_estimate: "pre-run estimate"
+  // Pull the first phase token, e.g. "0c", "1.7", "2.75", "2" — ignore any trailing "->2.5" arrow.
+  const m = s.match(/([0-9]+(?:\.[0-9]+)?[a-z]?)/);
+  if (!m) return "";
+  return PHASE_STEP[m[1]] || "";
+}
+function ph(p) { return (p && p.phases) || {}; }
+function stills(p) { return (p && p.stills) || {}; }
+function stillList(p) { return Object.values(stills(p)); }
+
+// Returns {steps:[{label,state}], current:int|-1, sub:string} for a /progress payload + run.
+function resolveStepper(prog, run) {
+  const status = run && run.status;
+  const terminalDone = status === "complete";
+  // budget_exhausted / over_estimate are stops too: mark the step it stopped at, not "current".
+  const terminalFail = ["failed", "cancelled", "interrupted", "budget_exhausted", "over_estimate"].includes(status);
+  const completes = STEPS.map((s) => { try { return !!s.done(prog || {}); } catch (e) { return false; } });
+  // current = lowest-numbered step whose complete is false
+  let current = completes.findIndex((c) => !c);
+  if (current === -1 && !terminalDone) current = STEPS.length - 1;   // all done() true but not terminal yet
+  // Floor: the backend's reported phase is authoritative for how far the run has actually gotten.
+  // The on-disk done() facts can lag (e.g. stills still "queued" while extraction has begun), which
+  // would otherwise pin the stepper to an earlier step than the run row shows. Advance current to at
+  // least the step the backend phase maps to — monotonic, never backward.
+  if (!terminalDone && run && run.phase) {
+    const label = phaseToStep(run.phase);
+    const idx = STEPS.findIndex((s) => s.label === label);
+    if (idx > current) current = idx;
+  }
+  if (terminalDone) current = -1;                       // all complete
+  const steps = STEPS.map((s, i) => {
+    let state;
+    if (terminalDone) state = "done";
+    else if (current === -1) state = "done";
+    else if (i < current) state = "done";               // monotonic: never move backward
+    else if (i === current) state = terminalFail ? "failed" : "current";
+    else state = "pending";
+    return { label: s.label, state };
+  });
+  // sub-line: for the current step, use `phase` membership hint; add per-still counts on Map·reduce
+  let sub = "";
+  if (current >= 0 && !terminalFail) {
+    const list = stillList(prog);
+    if (current === 3 && list.length) {                 // Extract knowledge (map · reduce)
+      const reduced = list.filter((s) => REDUCED.has(s.phase)).length;
+      const mapDone = list.reduce((a, s) => a + (s.map_completed || 0), 0);
+      const mapTot = list.reduce((a, s) => a + (s.map_total || 0), 0);
+      sub = `<b>${reduced}/${list.length} stills reduced</b>` + (mapTot ? ` · mapping ${mapDone}/${mapTot} pages` : "");
+    } else {
+      // The bold prefix is already the friendly step name; never append the raw "Phase N" marker.
+      sub = `<b>${esc(STEPS[current].label)}</b>`;
+    }
+  } else if (terminalFail) {
+    sub = `<b>${esc(status)}</b>` + (run && run.error ? ` · ${esc(run.error)}` : "");
+  } else if (terminalDone) {
+    sub = `<b>Complete</b>`;
+  }
+  return { steps, current, sub, terminalDone, terminalFail };
+}
+
+function stepperHtml(prog, run) {
+  const r = resolveStepper(prog, run);
+  const items = r.steps.map((s, i) => {
+    const mark = s.state === "done" ? "✓" : (s.state === "failed" ? "✕" : String(i + 1));
+    const cur = s.state === "current" ? ' aria-current="step"' : "";
+    return `<li class="${s.state}"${cur}><span class="marker" aria-hidden="true">${mark}</span>${esc(s.label)}</li>`;
+  }).join("");
+  let bar;
+  const running = run && run.status === "running" && r.current >= 0 && !r.terminalFail;
+  if (r.terminalDone) bar = `<div class="bar done"><div class="fill"></div></div>`;
+  else if (r.terminalFail) bar = `<div class="bar failed"><div class="fill"></div></div>`;
+  else if (running) {
+    const vt = esc("Running: " + (r.sub ? r.sub.replace(/<[^>]+>/g, "") : (STEPS[r.current] || {}).label || ""));
+    bar = `<div class="bar indeterminate" role="progressbar" aria-valuetext="${vt}"><div class="fill"></div></div>`;
+  } else bar = "";
+  return `<ol class="stepper" aria-label="Pipeline phases">${items}</ol>` +
+         (r.sub ? `<p class="step-sub">${r.sub}</p>` : "") + bar;
+}
+
+// Locate a field inside a given run's inline detail cell (data-field within tr[data-detail=id]).
+function detailField(id, field) {
+  const cell = document.querySelector(`tr.detail-row[data-detail="${CSS.escape(id)}"]`);
+  return cell ? cell.querySelector(`[data-field="${field}"]`) : null;
+}
+
+async function showDetail(id) {
+  // The detail row only exists while expanded; bail if the user collapsed it mid-flight.
+  const title = detailField(id, "title");
+  if (!title) return;
+  const [{ data: run }, { data: log }] = await Promise.all([api("GET", `/api/runs/${id}`), api("GET", `/api/runs/${id}/log?tail=60`)]);
+  const progressEl = detailField(id, "progress"), logEl = detailField(id, "logTail");
+  const artifactsEl = detailField(id, "artifacts"), resumeEl = detailField(id, "resume");
+  if (!title.isConnected || !progressEl) return;          // row was removed during the awaits
+  title.textContent = `${id}: ${run.status}`;
+  if (logEl) logEl.textContent = (log.lines || []).join("\n");
+  progressEl.innerHTML = "";
+  // Live progress for an active run — reuses the per-run progress/tpm routes on the same cadence
+  // as refresh(). Filesystem-derived, safe to poll alongside the run. No websockets/SSE.
+  if (run.status === "running") {
+    try {
+      const [{ data: prog }, { data: tpm }] = await Promise.all([
+        api("GET", `/api/runs/${id}/progress`), api("GET", `/api/runs/${id}/tpm`)]);
+      renderProgress(progressEl, prog, tpm, run);
+    } catch (e) {
+      progressEl.innerHTML = stepperHtml({}, run);        // stepper still renders without /progress
+    }
+  } else {
+    // Terminal / estimated runs: render the stepper from whatever /progress exists (done or failed).
+    try {
+      const { data: prog } = await api("GET", `/api/runs/${id}/progress`);
+      progressEl.innerHTML = stepperHtml(prog || {}, run);
+    } catch (e) { progressEl.innerHTML = stepperHtml({}, run); }
+  }
+  const costEl = detailField(id, "cost");
+  if (costEl) {
+    // run.estimate carries estimate_usd + full_usd_by_stage + pages/stills; omit the panel cleanly
+    // for a run with no estimate yet (costBreakdownHtml returns ""). Collapsible like the per-still
+    // detail; the <summary> keeps the headline total visible even when collapsed.
+    const html = costBreakdownHtml(run.estimate);
+    const total = run.estimate ? run.estimate.estimate_usd : undefined;
+    const totalLabel = (total !== null && total !== undefined) ? ` — ${usd(total)}` : "";
+    costEl.innerHTML = html
+      ? `<details class="cost-detail"><summary>Cost breakdown${totalLabel}</summary>${html}</details>`
+      : "";
+  }
+  attachEvalPanel(id, run);
+  if (artifactsEl) artifactsEl.innerHTML = (() => {
+    const links = artifactLinks(run.links);
+    return links ? `<b>Artifacts:</b> ${links}` : "";
+  })();
+  if (resumeEl) {
+    resumeEl.innerHTML = "";
+    if (run.resume_available) {
+      const { data: rs } = await api("GET", `/api/runs/${id}/resume`);
+      resumeEl.innerHTML = `<b>Budget exhausted</b> at ${esc(rs.stage_reached)} (spent ${usd(rs.spent_usd)}). Resume in a shell:<pre>${esc(rs.resume_command)}</pre>`;
+    } else if (run.viewer_command) {
+      resumeEl.innerHTML = `Viewer with chat (fallback — use <b>Open viewer</b> in the table):<pre>${esc(run.viewer_command)}</pre>`;
+    }
+  }
+}
+
+// Renders the phase stepper + indeterminate bar + token strip + per-still list for a live run into
+// the given target element (a run's inline detail progress field).
+function renderProgress(target, prog, tpm, run) {
+  let html = stepperHtml(prog || {}, run);
+  if (tpm && (tpm.total_input_tokens || tpm.total_output_tokens || tpm.total_calls)) {
+    const inT = tpm.total_input_tokens || 0, outT = tpm.total_output_tokens || 0, calls = tpm.total_calls || 0;
+    html += `<div class="tokens">Tokens: ${inT.toLocaleString()} in / ${outT.toLocaleString()} out · ${calls} call(s)</div>`;
+  }
+  const stObj = stills(prog), names = Object.keys(stObj).sort();
+  if (names.length) {
+    const rows = names.map((n) => {
+      const s = stObj[n] || {};
+      const pct = (s.map_pct ?? 0);
+      return `<tr><td>${esc(n)}</td><td>${esc(s.phase || "queued")}</td><td>${esc(String(pct))}%</td></tr>`;
+    }).join("");
+    html += `<details style="margin-top:6px"><summary>Per-still detail (${names.length})</summary>` +
+      `<table style="margin-top:6px"><thead><tr><th scope="col">Still</th><th scope="col">Phase</th><th scope="col">Map</th></tr></thead>` +
+      `<tbody>${rows}</tbody></table></details>`;
+  }
+  if (prog && prog.source && prog.source.files) {
+    html += `<div class="tokens">Source: ${esc(String(prog.source.files))} file(s) ${esc(prog.source.top_types || "")}</div>`;
+  }
+  target.innerHTML = html;
+}
+
+// ── Evaluation: one guided flow ─────────────────────────────────────────────────────────────
+// One persistent panel per run, re-attached into the inline detail row after every rebuild, so
+// the review list, the Advanced settings and a pending step survive the 10 s poll.
+//  · Grounding: the launcher runs the free check (no AI) automatically once a run is finished;
+//    the panel shows its one-line result (GET /api/runs/<id> → grounding).
+//  · "Score this spec": a 3-step flow — Answer key → Cost → Results — driven by the server's
+//    score_state summary (GET /api/runs/<id> → score_state); it only calls existing endpoints
+//    (/dataset, /dataset/review, /eval with plan_only, then /eval to start).
+// The full scorecard is the viewer's Evaluation tab, which reads GET /api/runs/<id>/eval.
+const evalPanels = new Map();
+const evalState = new Map();             // id -> {run, open, jr, plan:{sig,status,data}, planning, msg}
+let evalOptions = null;
+const EVAL_ACTIVE = new Set(["planning", "running"]);
+const isNum = (v) => typeof v === "number" && isFinite(v);
+const LEGEND_LINE = "Grounded = checked against your code, no AI. Score = compared with the known rules, graded by AI.";
+const KEY_INTRO = "To score correctness we first need the known rules for this code — built from your code and its tests (not from the generated spec). Free, no AI.";
+const DOUBLE_CHECK_HINT = "grades twice more and takes the majority";
+
+function evalAdvancedHtml(id) {
+  const o = evalOptions || { suites: [], answer_keys: [] };
+  const suites = (o.suites || []).map((x) => `<option value="${esc(x.id)}">${esc(x.id)} — ${esc(x.corpus || "")}</option>`).join("");
+  const keys = (o.answer_keys || []).map((k) => `<option value="${esc(k.id)}">${esc(k.label)}</option>`).join("");
+  return `<details class="eval-advanced"><summary>Advanced (for experts)</summary>` +
+    `<div class="row">` +
+      `<div><label for="ev-suite-${esc(id)}">Test set</label><select id="ev-suite-${esc(id)}" data-ev="suite"><option value="">Automatic</option>${suites}</select></div>` +
+      `<div><label for="ev-key-${esc(id)}">Answer key</label><select id="ev-key-${esc(id)}" data-ev="key"><option value="">Automatic</option>${keys}</select></div>` +
+      `<div><label for="ev-jr-${esc(id)}">Judge passes</label><input type="number" id="ev-jr-${esc(id)}" data-ev="jr" min="1" max="${(o.judge_runs || {}).max || 5}" step="1" placeholder="1"></div>` +
+      `<div><label for="ev-budget-${esc(id)}">Spending cap (USD)</label><input type="number" id="ev-budget-${esc(id)}" data-ev="budget" min="0.01" step="0.01" placeholder="estimate + 25%"></div>` +
+    `</div>` +
+    `<div class="hint">Defaults are chosen for you. Judge passes: 1 for a routine score, 3 for a number you will quote (3× the cost). ` +
+      `The cap defaults to the estimate plus 25%; scoring stops if it would exceed it.</div>` +
+    `<div class="eval-actions"><button class="secondary small" data-act="ds-ai">Build the answer key with AI suggestions too (up to $2)</button></div>` +
+    `</details>`;
+}
+
+function makeEvalPanel(id) {
+  const el = document.createElement("div");
+  el.className = "eval-panel";
+  el.dataset.run = id;
+  el.innerHTML =
+    `<h3>Evaluation</h3>` +
+    `<div class="hint eval-legend-line">${esc(LEGEND_LINE)}</div>` +
+    `<div data-ev="ground" class="ground-line"></div>` +
+    `<div data-ev="flow" class="score-flow"></div>` +
+    `<div data-ds="review" hidden></div>` +
+    evalAdvancedHtml(id);
+  el.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-act]");
+    if (!b || !el.contains(b) || b.closest("[data-item]")) return;   // review items handle their own
+    ev.preventDefault();
+    evalAction(id, b.dataset.act, b);
+  });
+  for (const k of ["suite", "key", "jr", "budget"]) {
+    const n = el.querySelector(`[data-ev="${k}"]`);
+    n.addEventListener("change", () => { const st = evalState.get(id) || {}; st.plan = null; st.planning = false; renderEvalPanel(id); });
+  }
+  el.querySelector('[data-ev="key"]').addEventListener("change", () => {   // a key implies its suite
+    const k = ((evalOptions && evalOptions.answer_keys) || []).find((x) => x.id === el.querySelector('[data-ev="key"]').value);
+    if (k && k.suite) el.querySelector('[data-ev="suite"]').value = k.suite;
+  });
+  return el;
+}
+function evq(id, k) { const el = evalPanels.get(id); return el ? el.querySelector(`[data-ev="${k}"]`) : null; }
+function dsq(id, k) { const el = evalPanels.get(id); return el ? el.querySelector(`[data-ds="${k}"]`) : null; }
+function setHtml(node, html) { if (node && node.dataset.html !== html) { node.innerHTML = html; node.dataset.html = html; } }
+
+// What to score against: the server's choice (approved data set > shipped key > draft), unless an
+// expert picked something under Advanced.
+function scoreBody(id, extra) {
+  const st = evalState.get(id) || {}, ss = (st.run || {}).score_state || {};
+  const b = { ...((ss.key && ss.key.use) || {}), judge_runs: st.jr || 1, ...(extra || {}) };
+  const suite = (evq(id, "suite") || {}).value, key = (evq(id, "key") || {}).value;
+  if (suite) { b.suite = suite; delete b.answer_key; }
+  if (key) b.answer_key = key;
+  const jr = parseInt((evq(id, "jr") || {}).value || "", 10);
+  if (jr > 0) b.judge_runs = jr;
+  return b;
+}
+function planSig(id) { return JSON.stringify(scoreBody(id)); }
+function capFor(id, planned) {
+  const typed = parseFloat((evq(id, "budget") || {}).value || "");
+  if (typed > 0) return typed;
+  const ceil = (evalOptions && evalOptions.budget_ceiling_usd) || 500;
+  return Math.min(ceil, Math.max(0.5, Math.ceil((planned || 0) * 1.25 * 100) / 100));
+}
+
+function groundingHtml(id, g) {
+  if (!g || !g.summary) return "";
+  const det = g.details ? ` · <a href="${esc(g.details)}" target="_blank" rel="noopener">details</a>` : "";
+  if (g.state === "running") return `<p class="ground running"><span class="spin" aria-hidden="true"></span>${esc(g.summary)}</p>`;
+  if (g.state === "none") return `<p class="ground none hint">Grounding not checked yet · <a href="#" data-act="recheck">Check grounding (free)</a></p>`;
+  const cls = g.state === "passed" ? "ok" : "warn";
+  return `<p class="ground ${cls}">${esc(g.summary)}${g.state === "passed" || g.state === "warning" ? det : ""} · ` +
+    `<a href="#" data-act="recheck" class="small-link">Re-check</a></p>`;
+}
+
+function stepsHtml(cur) {
+  const names = ["Answer key", "Cost", "Results"];
+  return `<ol class="stepper score-steps" aria-label="Score this spec">` + names.map((n, i) => {
+    const state = i < cur ? "done" : (i === cur ? "current" : "pending");
+    const mark = state === "done" ? "✓" : String(i + 1);
+    return `<li class="${state}"${state === "current" ? ' aria-current="step"' : ""}><span class="marker" aria-hidden="true">${mark}</span>${n}</li>`;
+  }).join("") + `</ol>`;
+}
+
+function resultHtml(r) {
+  if (!r) return "";
+  let h = `<p class="score-result"><b>${esc(r.summary)}</b>` +
+    (r.details ? ` · <a href="${esc(r.details)}" target="_blank" rel="noopener">details →</a>` : "") + `</p>`;
+  if (r.provisional) h += `<div class="callout warn">Provisional — ${esc(r.provisional)}</div>`;
+  if (r.note) h += `<p class="hint">${esc(r.note)}</p>`;
+  return h;
+}
+
+function keyStepHtml(id, ss, st) {
+  const k = ss.key || {}, d = k.dataset || {};
+  if (k.building) return `<p><span class="spin" aria-hidden="true"></span>Building the answer key from your code and its tests… (free, no AI)</p>`;
+  if (k.readiness === "draft") {
+    const n = d.total || 0, m = d.corroborated || 0;
+    let h = `<p><b>${n}</b> proposed · <b>${m}</b> confirmed by both code and tests</p>`;
+    if (st.confirmAll) {
+      return h + `<p>Approve all ${n} proposed rules? You can still reject individual ones later.</p>` +
+        `<div class="eval-actions"><button data-act="approve-all-yes">Approve all</button>` +
+        `<button class="secondary" data-act="approve-all-no">Back</button></div>`;
+    }
+    h += `<div class="eval-actions"><button data-act="approve-all">Approve all ${n} rules</button>` +
+      (m ? `<button class="secondary" data-act="approve-confirmed">Approve only the ${m} confirmed by both code and tests</button>` : "") +
+      `<a href="#" data-act="review">Review individually</a></div>` +
+      `<p class="hint"><a href="#" data-act="continue-draft">Continue without approving</a> (the score will be marked Provisional)</p>`;
+    return h;
+  }
+  const err = d.state === "failed" || d.state === "interrupted" ? `<p class="err">The last build did not finish${d.error ? ": " + esc(d.error) : ""}.</p>` : "";
+  return err + `<p>${esc(KEY_INTRO)}</p><div class="eval-actions"><button data-act="build">Build answer key</button></div>`;
+}
+
+function costStepHtml(id, ss, st) {
+  if (ss.busy === "smoke") return `<p class="hint"><span class="spin" aria-hidden="true"></span>Waiting for the grounding check to finish…</p>`;
+  const p = st.plan && st.plan.sig === planSig(id) ? st.plan : null;
+  if (!p || st.planning) return `<p class="hint"><span class="spin" aria-hidden="true"></span>Working out the cost — nothing is spent…</p>`;
+  if (p.status !== 200) {
+    const d = p.data || {};
+    return `<p class="err">${esc(d.error || ("HTTP " + p.status))}</p>` +
+      `<div class="eval-actions"><button class="secondary" data-act="replan">Try again</button><button class="secondary" data-act="cancel">Cancel</button></div>`;
+  }
+  const d = p.data || {}, cap = capFor(id, d.planned_usd);
+  const prov = d.provisional || (ss.key && ss.key.provisional);
+  return (prov ? `<div class="callout warn">The answer key is not reviewed yet, so this score will be marked Provisional.</div>` : "") +
+    `<p>Estimated cost <b>${usd(d.planned_usd)}</b> — nothing spent yet</p>` +
+    `<p class="hint">Scoring stops automatically if it would cost more than ${usd(cap)}.${(d.judge_runs || 1) > 1 ? " Grades " + d.judge_runs + " times and takes the majority." : ""}</p>` +
+    `<div class="eval-actions"><button data-act="start">Start scoring</button><button class="secondary" data-act="cancel">Cancel</button></div>`;
+}
+
+function renderEvalPanel(id) {
+  const st = evalState.get(id); if (!st || !st.run) return;
+  const run = st.run, ss = run.score_state || {};
+  setHtml(evq(id, "ground"), groundingHtml(id, run.grounding));
+  const k = ss.key || {};
+  const keyReady = k.readiness === "approved" || k.readiness === "shipped" || (k.readiness === "draft" && st.continueDraft);
+  let h = "";
+  const sc = ss.scoring;
+  if (sc && EVAL_ACTIVE.has(sc.state)) {
+    h = stepsHtml(2) + `<p><span class="spin" aria-hidden="true"></span>Scoring… spent <b>${usd(sc.spent_usd)}</b> so far` +
+      (isNum(sc.planned_usd) ? ` (estimated ${usd(sc.planned_usd)})` : "") + `; stops at ${usd(sc.budget_usd)}.</p>`;
+    st.open = false;
+  } else if (st.open) {
+    if (!keyReady) h = stepsHtml(0) + keyStepHtml(id, ss, st);
+    else {
+      const ready = k.readiness === "draft" ? `<p class="hint">Using the unreviewed answer key (${esc(String(k.dataset && k.dataset.total || 0))} proposed rules).</p>`
+        : `<p class="ok">Answer key ready — ${esc(String(k.rules ?? "?"))} approved rules</p>`;
+      h = stepsHtml(1) + ready + costStepHtml(id, ss, st);
+      if (!st.planning && !(st.plan && st.plan.sig === planSig(id)) && ss.busy !== "smoke") requestPlan(id);
+    }
+  } else {
+    const r = ss.result;
+    if (sc && !EVAL_ACTIVE.has(sc.state) && sc.state !== "complete" && !r) {
+      h += `<p class="err">The last scoring did not finish: ${esc(sc.error || sc.state)}</p>`;
+    }
+    if (r) {
+      h += resultHtml(r);
+      h += `<div class="eval-actions">` +
+        (r.double_check ? `<button class="secondary" data-act="double-check">Double-check this score</button><span class="hint">${esc(DOUBLE_CHECK_HINT)}</span>` : "") +
+        `<a href="#" data-act="score">Score again</a></div>`;
+    } else {
+      h += `<div class="eval-actions"><button data-act="score">Score this spec</button>` +
+        `<span class="hint">Compares the spec with the known rules for this code. You see the cost before anything is spent.</span></div>`;
+    }
+  }
+  if (st.msg) h += `<p class="${st.msg.err ? "err" : "hint"}">${esc(st.msg.text)}</p>`;
+  setHtml(evq(id, "flow"), h);
+  // keep polling quickly while something is moving
+  const moving = (run.grounding && run.grounding.state === "running") || k.building || (sc && EVAL_ACTIVE.has(sc.state)) || ss.busy;
+  clearTimeout(st.timer);
+  if (moving) st.timer = setTimeout(() => evalTick(id), 2000);
+}
+
+async function evalTick(id) {
+  const st = evalState.get(id); if (!st) return;
+  const { status, data } = await api("GET", `/api/runs/${id}`);
+  if (status !== 200) return;
+  st.run = data;
+  renderEvalPanel(id);
+}
+
+async function requestPlan(id) {
+  const st = evalState.get(id); if (!st || st.planning) return;
+  st.planning = true;
+  const sig = planSig(id);
+  const ceil = (evalOptions && evalOptions.budget_ceiling_usd) || 500;
+  const { status, data } = await api("POST", `/api/runs/${id}/eval`, scoreBody(id, { plan_only: true, budget_usd: ceil }));
+  st.planning = false;
+  st.plan = { sig, status, data };
+  await evalTick(id);
+}
+
+async function evalAction(id, act, btn) {
+  const st = evalState.get(id) || {}; evalState.set(id, st);
+  st.msg = null;
+  const fail = (s, d) => { st.msg = { err: true, text: `${d.error || "HTTP " + s}` }; };
+  if (act === "recheck") {
+    const { status, data } = await api("POST", `/api/runs/${id}/eval`, { smoke: true });
+    if (status !== 202) fail(status, data);
+  } else if (act === "score") {
+    st.open = true; st.plan = null; st.jr = 1; st.continueDraft = false; st.confirmAll = false;
+  } else if (act === "double-check") {
+    st.open = true; st.plan = null; st.jr = ((st.run || {}).score_state || {}).judge_runs_double_check || 3;
+  } else if (act === "cancel") {
+    st.open = false; st.plan = null;
+  } else if (act === "build" || act === "ds-ai") {
+    const body = act === "ds-ai" ? { ai_suggestions: true, max_usd: 2 } : {};
+    if (act === "ds-ai" && !confirm("Build the answer key with AI suggestions too? This spends up to $2.")) return;
+    const { status, data } = await api("POST", `/api/runs/${id}/dataset`, body);
+    if (status !== 202) fail(status, data);
+    st.open = true;
+  } else if (act === "approve-all") {
+    st.confirmAll = true;
+  } else if (act === "approve-all-no") {
+    st.confirmAll = false;
+  } else if (act === "approve-all-yes" || act === "approve-confirmed") {
+    st.confirmAll = false;
+    const { status, data } = await api("POST", `/api/runs/${id}/dataset/review`,
+      { approve: act === "approve-all-yes" ? "all" : "corroborated", reviewer: dsReviewer() });
+    if (status !== 200) fail(status, data);
+    else if (!data.counts || !data.counts.approved) st.msg = { text: "Nothing was approved — review the rules individually." };
+    const r = dsq(id, "review"); if (r && !r.hidden) loadDsItems(id);
+  } else if (act === "review") {
+    const r = dsq(id, "review");
+    if (!dsState.get(id)) dsState.set(id, { filter: { status: "needs_review", source: "", q: "", page: 1 } });
+    r.hidden = !r.hidden; if (!r.hidden) loadDsItems(id);
+  } else if (act === "continue-draft") {
+    st.continueDraft = true; st.plan = null;
+  } else if (act === "replan") {
+    st.plan = null;
+  } else if (act === "start") {
+    const p = st.plan && st.plan.data || {};
+    if (btn) btn.disabled = true;
+    const { status, data } = await api("POST", `/api/runs/${id}/eval`, scoreBody(id, { budget_usd: capFor(id, p.planned_usd) }));
+    if (status !== 202) { st.plan = { sig: planSig(id), status, data }; }
+    else { st.open = false; st.plan = null; }
+  }
+  await evalTick(id);
+}
+
+// A run can be evaluated only once it has finished and produced output. Running, queued,
+// cancelled and failed-before-output runs have nothing to score yet.
+function canEvaluate(r) {
+  if (!r) return false;
+  if (["complete", "imported"].includes(r.status)) return true;
+  return ["failed", "budget_exhausted"].includes(r.status) && !!(r.links && r.links.viewer);
+}
+
+function attachEvalPanel(id, run) {
+  const slot = detailField(id, "eval");
+  if (!slot) return;
+  if (!canEvaluate(run)) {
+    const el = evalPanels.get(id);
+    if (el && el.parentNode) el.parentNode.removeChild(el);
+    const msg = ["running", "queued", "estimating", "estimated"].includes(run && run.status)
+      ? "Evaluation becomes available when this run completes."
+      : "This run produced no output to evaluate.";
+    slot.innerHTML = `<p class="hint">${esc(msg)}</p>`;
+    return;
+  }
+  if (slot.querySelector("p.hint") && !slot.querySelector(".eval-panel")) slot.innerHTML = "";
+  let el = evalPanels.get(id);
+  if (!el) { el = makeEvalPanel(id); evalPanels.set(id, el); }
+  const st = evalState.get(id) || {};
+  st.run = run;
+  evalState.set(id, st);
+  if (el.parentNode !== slot) slot.appendChild(el);
+  renderEvalPanel(id);
+}
+
+// ── Answer key review list ("Review individually") ────────────────────────────────────────────
+// The answer key (test data set) is built by the launcher from this run's CODE and its TESTS
+// (eval/keygen/build_key.py, no AI unless asked), never from the generated spec, so it can fairly
+// grade the spec. A person approves, edits or rejects each proposed rule here.
+const dsState = new Map();               // id -> {filter:{status,source,q,page}}
+function dsReviewer() { try { return localStorage.getItem("distill:reviewer") || undefined; } catch (e) { return undefined; } }
+function dsExcerpt(e) {
+  return `<div class="from">${esc(e.file)}:${esc(String(e.start_line))}</div><pre>` + e.lines.map((l) =>
+    `<span class="${l.cited ? "hl" : ""}"><span class="ln">${l.n}</span>${esc(l.text)}</span>` + (l.cited ? "" : "\n")).join("") + `</pre>`;
+}
+function dsItemHtml(it) {
+  const label = { unreviewed: "needs review", approved: "approved", edited: "approved (edited)", rejected: "rejected" }[it.status] || it.status;
+  return `<div class="ds-item ${esc(it.status)}" data-item="${esc(it.id)}">` +
+    `<div>${esc(it.statement)}${it.corroborated ? `<span class="ds-tag">confirmed by both code and tests</span>` : ""}</div>` +
+    `<div class="from">From: ${esc(it.sources.join(", "))} · ${esc(it.type)} · <b>${esc(label)}</b>${it.reviewer ? " by " + esc(it.reviewer) : ""}</div>` +
+    it.excerpts.map(dsExcerpt).join("") +
+    `<div class="eval-actions"><button class="small" data-act="approve">Approve</button>` +
+    `<button class="secondary small" data-act="edit">Edit</button><button class="secondary small" data-act="reject">Reject</button></div>` +
+    `<div data-editbox hidden><textarea>${esc(it.statement)}</textarea><button class="small" data-act="save">Save edit</button></div></div>`;
+}
+async function loadDsItems(id) {
+  const r = dsq(id, "review"); if (!r) return;
+  const st = dsState.get(id); const f = st.filter;
+  const qs = new URLSearchParams({ status: f.status, source: f.source, q: f.q, page: String(f.page) });
+  const { status, data } = await api("GET", `/api/runs/${id}/dataset/items?${qs}`);
+  if (status !== 200) { r.innerHTML = `<p class="err">${status}: ${esc(data.error || "error")}</p>`; return; }
+  const c = data.counts || {};
+  r.innerHTML = `<div class="ds-bar">` +
+      `<select data-f="status" aria-label="Show"><option value="needs_review">Needs review</option><option value="approved">Approved</option><option value="rejected">Rejected</option><option value="corroborated">Confirmed by both</option><option value="">All</option></select>` +
+      `<select data-f="source" aria-label="Where it came from"><option value="">From: anywhere</option><option value="code">From: code</option><option value="tests">From: tests</option><option value="ai">From: AI</option></select>` +
+      `<input type="search" data-f="q" placeholder="Search rules" value="${esc(f.q)}">` +
+      `<input data-f="reviewer" placeholder="Your name (optional)" maxlength="80" value="${esc(dsReviewer() || "")}">` +
+      `<b>${c.reviewed || 0} of ${c.total || 0} reviewed</b> <span class="hint">— saved as you go</span></div>` +
+    (data.items.length ? data.items.map(dsItemHtml).join("") : `<p class="hint">Nothing here.</p>`) +
+    `<div class="ds-bar"><button class="secondary small" data-pg="-1" ${data.page <= 1 ? "disabled" : ""}>Previous</button>` +
+    `<span class="hint">Page ${data.page} of ${data.pages} (${data.total} items)</span>` +
+    `<button class="secondary small" data-pg="1" ${data.page >= data.pages ? "disabled" : ""}>Next</button></div>`;
+  r.querySelector('[data-f="status"]').value = f.status;
+  r.querySelector('[data-f="source"]').value = f.source;
+  for (const k of ["status", "source"]) r.querySelector(`[data-f="${k}"]`).addEventListener("change", (e) => { f[k] = e.target.value; f.page = 1; loadDsItems(id); });
+  r.querySelector('[data-f="q"]').addEventListener("change", (e) => { f.q = e.target.value; f.page = 1; loadDsItems(id); });
+  r.querySelector('[data-f="reviewer"]').addEventListener("change", (e) => { try { localStorage.setItem("distill:reviewer", e.target.value.trim()); } catch (x) {} });
+  for (const b of r.querySelectorAll("[data-pg]")) b.addEventListener("click", () => { f.page = Math.max(1, f.page + parseInt(b.dataset.pg, 10)); loadDsItems(id); });
+  for (const box of r.querySelectorAll("[data-item]")) {
+    box.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-act]"); if (!b) return;
+      const act = b.dataset.act, iid = box.dataset.item;
+      if (act === "edit") { box.querySelector("[data-editbox]").hidden = false; return; }
+      const dec = act === "save" ? { id: iid, action: "edit", statement: box.querySelector("textarea").value } : { id: iid, action: act };
+      const { status: s2, data: d2 } = await api("POST", `/api/runs/${id}/dataset/review`, { decisions: [dec], reviewer: dsReviewer() });
+      if (s2 !== 200) { box.insertAdjacentHTML("beforeend", `<p class="err">${esc(d2.error || "error")}</p>`); return; }
+      evalTick(id); loadDsItems(id);
+    });
+  }
+}
+// ── Compare two runs' evaluations ───────────────────────────────────────────────────────────
+function fillCompareSelects(runs) {
+  runs = runs.filter(canEvaluate);  // only finished runs with output can be compared
+  $("cmpBtn").disabled = runs.length < 2;
+  for (const sid of ["cmpA", "cmpB"]) {
+    const sel = $(sid);
+    if (document.activeElement === sel) continue;
+    const cur = sel.value;
+    sel.innerHTML = runs.map((r) => `<option value="${esc(r.run_id)}">${esc(r.run_id)}</option>`).join("");
+    if (cur && runs.some((r) => r.run_id === cur)) sel.value = cur;
+    else if (sid === "cmpB" && runs.length > 1) sel.selectedIndex = 1;
+  }
+}
+$("cmpBtn").addEventListener("click", async () => {
+  const a = $("cmpA").value, b = $("cmpB").value;
+  if (!a || !b) { $("cmpOut").innerHTML = `<p class="hint">Pick two finished runs to compare.</p>`; return; }
+  if (a === b) { $("cmpOut").innerHTML = `<p class="hint">Pick two different runs.</p>`; return; }
+  $("cmpOut").innerHTML = `<p class="hint">Comparing…</p>`;
+  const { status, data } = await api("GET", `/api/eval/compare?runs=${encodeURIComponent(a)},${encodeURIComponent(b)}`);
+  if (status !== 200) { $("cmpOut").innerHTML = `<p class="err">${status}: ${esc(data.error || "error")}</p>`; return; }
+  const cell = (m) => (m.status === "measured" && isNum(m.value))
+    ? `${m.value}${m.ci95 ? ` <span class="hint">[${m.ci95[0]}–${m.ci95[1]}]</span>` : ""}` : `<span class="eval-nm">not measured</span>`;
+  const flag = (r) => r.within_noise === true ? "within noise" : (r.within_noise === false ? "<b>outside noise</b>" : "–");
+  const rows = data.rows.filter((r) => r.a.status === "measured" || r.b.status === "measured").map((r) =>
+    `<tr><td><span class="eval-chip ${r.kind === "exact" ? "exact" : "est"}">${esc(r.kind)}</span> ${esc(r.label || r.name)}</td>` +
+    `<td class="num">${cell(r.a)}</td><td class="num">${cell(r.b)}</td><td class="num">${r.delta === null ? "–" : r.delta}</td>` +
+    `<td>${flag(r)}<div class="hint">${esc(r.basis)}</div></td></tr>`).join("");
+  $("cmpOut").innerHTML = (data.warning ? `<div class="callout warn">${esc(data.warning)}</div>` : "") +
+    `<p class="hint">${esc(data.rules.estimated)}. ${esc(data.rules.exact)}.</p>` +
+    `<table class="compare-table"><thead><tr><th scope="col">Metric</th><th scope="col" class="num">${esc(a)}</th><th scope="col" class="num">${esc(b)}</th><th scope="col" class="num">Δ (B−A)</th><th scope="col">Reading</th></tr></thead><tbody>${rows}</tbody></table>`;
+});
+
+// Suites and answer keys (server-side ids) — loaded before the first refresh so panels have them.
+const evalOptionsReady = api("GET", "/api/eval/options")
+  .then(({ status, data }) => { if (status === 200) evalOptions = data; }).catch(() => {});
+
+api("GET", "/api/config").then(({ data }) => {
+  if (data.stills) $("stillsHint").textContent = "Available: " + data.stills.join(" ");
+  const def = data.default_model_id;
+  if (!def) return;
+  const sel = $("model");
+  const match = Array.from(sel.options).find((o) => o.value === def);
+  if (match) {
+    sel.value = def;
+  } else {
+    // Keep the server's configured default honest: never hide it. Prepend it as a selected
+    // first option labeled with its raw id, then still show the three curated choices.
+    const opt = document.createElement("option");
+    opt.value = def;
+    opt.textContent = def + " (configured default)";
+    sel.insertBefore(opt, sel.firstChild);
+    sel.value = def;
+  }
+});
+// Poll cadence: 10 s is live enough for a multi-minute pipeline without the constant repaint flicker
+// of a tighter loop. The whole list re-renders each tick; a longer interval is the low-risk lever.
+// Wait for the evaluation options first so the Evaluate panel renders with its choices.
+evalOptionsReady.finally(() => { refresh(); setInterval(refresh, 10000); });
+</script>
+</body>
+</html>

@@ -1,0 +1,758 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+#
+# ANSWER KEY - synthetic JC Change Orders corpus (construction contractor ERP, VB.NET + SQL Server)
+# Kept OUTSIDE the corpus so tools under test cannot see it.
+# All file paths are relative to synthetic-corpus/jc-changeorders/. Line ranges are 1-based and inclusive.
+#
+# type:            rule | state | workflow | exception
+# evidence_class:  Verified | Inferred | Unknown | Confirmation Required
+#   Verified              - the code states the behavior directly, and the layers agree
+#   Inferred              - follows from combining code paths, or from the absence of code (e.g. no callers)
+#   Unknown               - the corpus does not contain the code that would settle it
+#   Confirmation Required - the code is contradictory or the rule exists only as prose; a business owner must decide
+# flags (trap flags):
+#   duplicated_logic | logic_flaw | undocumented_feature | inconsistency | dead_code | comment_only | db_only
+#
+# PRIMARY seeded traps:
+#   duplicated_logic      BR-003 (markup/total, 4 copies), BR-009 (PM threshold, 6+ copies), BR-022 (sub CO cap, 4 copies)
+#   logic_flaw            BR-027 (Save & Approve bypasses approval proc), BR-028 (deducts bypass all limits),
+#                         BR-029 (report 615 end-date boundary)
+#   undocumented_feature  BR-007 (silent 5% sub markup cap), BR-024 (T&M owner CO auto-approval),
+#                         BR-025 (hidden support-desk override)
+#   inconsistency         BR-006 (max markup UI 20% vs DB 15%), BR-019 (soft-closed jobs: UI blocks, DB allows)
+#   dead_code             BR-031 (fee-on-fee)
+#   comment_only          BR-030 (owner countersignature before approval)
+#   db_only               BR-016 (exported approved COs cannot be voided)
+# Secondary / incidental traps are flagged on other items too.
+
+corpus: jc-changeorders
+module: JC
+version: 1
+
+items:
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+
+  - id: BR-001
+    type: rule
+    statement: >-
+      Change order numbers are per job, 3 characters, zero padded (001-999), assigned as MAX(CONum)+1.
+      Numbers are never reused (void COs keep theirs). After 999 the job cannot take more COs (return 2).
+      Office entry and field import both use usp_JCCONextNum.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCONextNum.sql, start_line: 27, end_line: 37}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 107, end_line: 110}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 104, end_line: 116}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 78, end_line: 83}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-002
+    type: rule
+    statement: >-
+      A change order is Owner (O), Subcontract (S) or Internal (I). A subcontract CO must name a subcontract.
+      The UI/BL and the field import check this. No DB constraint enforces SL for type S. Field requests
+      may only be OWNER or SUB, never Internal.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 76, end_line: 76}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 112, end_line: 112}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 90, end_line: 96}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 152, end_line: 160}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 54, end_line: 58}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-003
+    type: rule
+    statement: >-
+      CO amounts: item Amount = ROUND(Units x UnitCost, 2). Cost = sum of item amounts. Markup = Cost x
+      MarkupPct / 100. Tax = taxable cost x job TaxRate. Total = Cost + Markup + Tax. The calculation is
+      written four times: (1) usp_JCCOSubmit, which is authoritative and overwrites the stored header
+      amounts on submit; (2) the entry form preview RecalcPreview, which rounds markup and tax per line
+      (MidpointRounding.AwayFromZero) and then sums; (3) clsJCCOBL.CalcTotals, which uses Math.Round
+      banker's rounding on the totals and has no callers; (4) the report 615 formula @MarkupEarned/@LineTotal,
+      which recomputes markup from the stored MarkupPct and ignores the 5% sub cap. The stored
+      MarkupAmt/TotalAmt from the proc win, except for COs approved through Save & Approve, which keep the
+      form preview totals (see BR-027).
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 79, end_line: 92}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 114, end_line: 123}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 164, end_line: 188}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 49, end_line: 65}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 32}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 187, end_line: 197}
+    evidence_class: Confirmation Required
+    flags: [duplicated_logic, inconsistency]
+
+  - id: BR-004
+    type: rule
+    statement: >-
+      The entry screen writes its preview totals (per-line rounding) to the header on every save (SaveTotals).
+      Submit later overwrites them with the proc's totals (rounding on the sum). So a CO's stored amount can
+      change by cents between Save and Submit. The preview total also decides whether Save & Approve is
+      offered and whether the executive-approval label shows.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 170, end_line: 187}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 241, end_line: 241}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 187, end_line: 197}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 90, end_line: 92}
+    evidence_class: Inferred
+    flags: [logic_flaw]
+
+  - id: BR-005
+    type: rule
+    statement: >-
+      Default markup is JCCoParm.DfltMarkupPct (10%). The entry screen pre-fills it and falls back to the
+      hardcoded DFLT_MARKUP_PCT (10) if the parameters are missing. Field-imported COs always get the company
+      default markup.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 19, end_line: 19}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 72, end_line: 76}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 48, end_line: 48}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 66}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-006
+    type: rule
+    statement: >-
+      Maximum markup disagrees across layers. The UI and BL allow 0-20% (MAX_MARKUP_PCT = 20). The database
+      allows at most 15%: check constraint ckJCCOHdr_Mkup BETWEEN 0 AND 15, JCCoParm.MaxMarkupPct = 15 and
+      the usp_JCCOSubmit check (return 8). A markup between 15% and 20% passes the screen, then fails the
+      first save with a raw constraint error ("Save failed: ...").
+    locations:
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 47, end_line: 47}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 107, end_line: 110}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 143, end_line: 151}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 20, end_line: 20}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 114, end_line: 114}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 67, end_line: 74}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 231, end_line: 235}
+    evidence_class: Confirmation Required
+    flags: [inconsistency]
+
+  - id: BR-007
+    type: rule
+    statement: >-
+      Subcontract COs have their markup silently capped at 5% when submitted. MarkupAmt is computed at 5%,
+      but the stored MarkupPct keeps the entered value, and there is no message. The entry preview shows the
+      uncapped markup, and report 615 recomputes markup from the stored (uncapped) MarkupPct.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 90}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 114, end_line: 123}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 31}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 175, end_line: 175}
+    evidence_class: Verified
+    flags: [undocumented_feature]
+
+  - id: BR-008
+    type: rule
+    statement: >-
+      Sales tax applies only to items flagged taxable (TaxYN = 'Y'), at the job's TaxRate, on cost only.
+      Markup is not taxed.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 82, end_line: 85}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 91, end_line: 91}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 176, end_line: 178}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 60, end_line: 63}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 42, end_line: 42}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 138, end_line: 138}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-009
+    type: rule
+    statement: >-
+      A PM can approve COs up to the executive threshold of $50,000; larger COs need PX/VP/CFO. The number
+      is held in several places: JCCoParm.COApprThreshold (default and seed), the JCCOApprLim PM row,
+      modJCGlobals.CO_PM_LIMIT (also used as the PM role limit), the entry-screen label, report 615
+      (hardcoded 50000 and footer text) and the field export flag requiresExecApproval. The comparison at
+      the boundary differs. clsJCCOBL.RequiresExecApproval uses >= (it blocks a PM at exactly $50,000.00,
+      and the field export says requiresExecApproval = true). The proc, entry label and report use >
+      (exactly $50,000.00 is within PM authority).
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 18, end_line: 18}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 220, end_line: 220}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 232, end_line: 232}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 39, end_line: 42}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 67, end_line: 68}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 144, end_line: 146}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 158, end_line: 159}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 78, end_line: 78}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 186, end_line: 186}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 92, end_line: 92}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 97, end_line: 101}
+      - {file: Scripts/Reports/615.sql, start_line: 31, end_line: 31}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 44, end_line: 44}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 91, end_line: 91}
+    evidence_class: Confirmation Required
+    flags: [duplicated_logic, inconsistency]
+
+  - id: BR-010
+    type: rule
+    statement: >-
+      Approval limits by role: ENTRY $0 (no authority), PM $50,000, PX $250,000, VP $1,000,000, CFO
+      $999,999,999.99. The approver's limit must be at least the CO total. JCCOApprLim is what the proc uses;
+      modJCGlobals.GetRoleApprLimit is a hardcoded copy used by the screens.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 231, end_line: 235}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 64, end_line: 78}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 93, end_line: 93}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 102, end_line: 106}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 160, end_line: 161}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 38, end_line: 38}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-011
+    type: rule
+    statement: >-
+      Segregation of duties: the approver cannot be the user who entered the CO (EntBy). Only EntBy is
+      compared. For field-imported COs EntBy is 'FIELDAPI', so the field requester (ReqBy) is never checked.
+      The Save & Approve path skips the check entirely.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 82, end_line: 86}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 154, end_line: 156}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-012
+    type: rule
+    statement: >-
+      Only users with an active JC role above ENTRY can approve (proc return 3). The approval screen disables
+      Approve, Reject and Post for ENTRY or blank roles.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 75, end_line: 80}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 39, end_line: 43}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-013
+    type: rule
+    statement: >-
+      Only a Pending Approval CO can be approved or rejected. Rejecting needs a reason. It sets status R,
+      saves RejReason and clears ApprBy/ApprDate. The proc does not check the rejecting user's role; only the
+      UI stops ENTRY users.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 49, end_line: 70}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 100, end_line: 114}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 150, end_line: 153}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-014
+    type: rule
+    statement: >-
+      A rejected CO can be reopened to Draft (SubmitDate cleared) for rework, or voided.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 216, end_line: 220}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 298, end_line: 305}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 45, end_line: 45}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-015
+    type: rule
+    statement: >-
+      Voiding needs a reason (BL and trigger). Interfaced (posted) COs cannot be voided; the user must enter
+      a reversing CO instead. A CO that is already void cannot be voided again.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 212, end_line: 223}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 209, end_line: 214}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 51, end_line: 58}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 281, end_line: 296}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-016
+    type: rule
+    statement: >-
+      An approved CO that has already been exported to the field app (ExpFlag = 'Y') cannot be voided. Only
+      the update trigger enforces this, with a generic "Change order cannot be voided." message. The BL
+      CanVoid and the entry screen still allow and offer Void for approved COs.
+    locations:
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 60, end_line: 66}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 212, end_line: 223}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 310, end_line: 310}
+    evidence_class: Verified
+    flags: [db_only]
+
+  - id: BR-017
+    type: rule
+    statement: >-
+      Once a CO is Approved or Interfaced, its amounts (Cost, Markup, Tax, Total) and type are frozen. Only
+      the trigger enforces this.
+    locations:
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 23, end_line: 34}
+    evidence_class: Verified
+    flags: [db_only]
+
+  - id: BR-018
+    type: rule
+    statement: >-
+      CO items can only be inserted, changed or deleted while the CO is Draft or Rejected (item trigger).
+      Units and unit cost cannot both be negative. The entry grid is read-only unless the CO is Draft.
+    locations:
+      - {file: Scripts/Triggers/trg_JCCOItem_iud.sql, start_line: 16, end_line: 37}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 312, end_line: 312}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-019
+    type: rule
+    statement: >-
+      Closed-job rule disagrees across layers. The entry screen and BL refuse COs on jobs that are soft
+      closed (2) or hard closed (3). usp_JCCOSubmit, usp_JCCOFieldImport and usp_JCCOInterface block only
+      hard closed (3). So soft-closed jobs accept COs from the field app, and the database accepts them.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 114, end_line: 119}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 78, end_line: 81}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 55, end_line: 59}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 48, end_line: 52}
+      - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 42, end_line: 47}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 31, end_line: 31}
+    evidence_class: Confirmation Required
+    flags: [inconsistency]
+
+  - id: BR-020
+    type: rule
+    statement: >-
+      A Value Engineering (VAL) CO must be a deduct (total < 0). The BL checks this on save and
+      usp_JCCOSubmit on submit (return 9). Field requests cannot have negative amounts, so a VAL field
+      request can never be submitted.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 102, end_line: 105}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 94, end_line: 98}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 196, end_line: 197}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-021
+    type: rule
+    statement: >-
+      A subcontract CO must be submitted within JCCoParm.NoticeDays (21) calendar days of its request date:
+      day 21 passes, day 22 fails (return 10). This is checked only at submit, with no warning on the entry
+      screen.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 100, end_line: 105}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 23, end_line: 23}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-022
+    type: rule
+    statement: >-
+      Subcontract CO cap: total COs on a subcontract cannot exceed MaxCOPct (default JCCoParm.DfltMaxCOPct
+      25%) of the original subcontract value. The logic exists in four places, with different definitions of
+      "used". usp_JCCOApprove (authoritative) sums CostAmt of S COs in status A or I. clsJCCOBL.CheckSubCap,
+      SubCapRemaining and the subcontract maintenance screen use CurCost - OrigCost, which only counts posted
+      (I) COs, so approved-but-unposted COs are ignored. The screens therefore show more remaining capacity
+      than the approval proc will allow.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 129, end_line: 137}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 114, end_line: 115}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 175, end_line: 198}
+      - {file: ClientSide/JC/JC/frmJCSubcontractMaint.vb, start_line: 66, end_line: 77}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 135, end_line: 141}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 219, end_line: 222}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 21, end_line: 21}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 67, end_line: 67}
+    evidence_class: Confirmation Required
+    flags: [duplicated_logic, inconsistency]
+
+  - id: BR-023
+    type: rule
+    statement: >-
+      Approving a subcontract CO needs the subcontract to be Open (SLStatus 0; return 11) and the sub's
+      insurance expiry to be present and not past (return 12). Only usp_JCCOApprove checks these.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 112, end_line: 127}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-024
+    type: rule
+    statement: >-
+      Owner COs on Time and Material (TM) jobs are approved automatically on submit, regardless of amount:
+      status goes D -> A with ApprBy = 'SYSTEM'. The entry screen still says "Submitted for approval." and sets
+      its local status to Pending. The only visible trace is the AutoAppr "(auto)" flag on report 615.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 112}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 119, end_line: 122}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 256, end_line: 259}
+      - {file: Scripts/Reports/615.sql, start_line: 32, end_line: 32}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 34, end_line: 34}
+    evidence_class: Verified
+    flags: [undocumented_feature]
+
+  - id: BR-025
+    type: rule
+    statement: >-
+      Hidden support-desk override. On the approval screen, Ctrl+Shift+F12 toggles an override for users
+      listed in JCAdmUsers. The only sign is a trailing period in the window title. With the override on, the
+      client-side CanApprove check is skipped and usp_JCCOApprove skips the PM threshold and role limit checks.
+      SoD, status and subcontract checks still apply. The approved CO gets OvrFlag = 'Y', and the audit row
+      note says 'override'.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 61, end_line: 70}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 81, end_line: 86}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 83, end_line: 86}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 88, end_line: 107}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 140, end_line: 142}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 174, end_line: 179}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 261, end_line: 261}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 72, end_line: 72}
+    evidence_class: Verified
+    flags: [undocumented_feature]
+
+  - id: BR-026
+    type: rule
+    statement: >-
+      Save & Approve: on the entry screen, a Draft CO whose preview total is at most $2,500 (MINOR_CO_LIMIT)
+      can be saved and approved in one step. Comments say "PM only", but the code allows any role other than
+      ENTRY or blank (PM, PX, VP, CFO).
+    locations:
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 44, end_line: 45}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 169, end_line: 173}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 187, end_line: 187}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279}
+    evidence_class: Verified
+    flags: [inconsistency]
+
+  - id: BR-027
+    type: rule
+    statement: >-
+      Save & Approve bypasses approval. It calls clsJCCODAL.SetStatus with a direct UPDATE (D -> A, which
+      the trigger allows), never calling usp_JCCOSubmit or usp_JCCOApprove. So the person entering the CO
+      approves it (no segregation of duties), and none of the proc checks run: role limit table, sub open,
+      insurance, sub CO cap (the BL check uses CurCost), notice period, VAL deduct, server-side recompute and
+      the 5% sub markup cap. The stored amounts stay as the screen preview, and SubmitDate stays null.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 199, end_line: 207}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 45, end_line: 45}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 169, end_line: 173}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 241, end_line: 241}
+    evidence_class: Inferred
+    flags: [logic_flaw]
+
+  - id: BR-028
+    type: rule
+    statement: >-
+      Deductive (negative) COs bypass every amount limit. The PM threshold and role-limit comparisons
+      (Total > limit) and CanQuickApprove (preview <= $2,500) use the signed total, not the absolute value. A
+      PM can approve a -$400,000 credit, and any non-ENTRY user can Save & Approve one in a single step.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 97, end_line: 106}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 144, end_line: 146}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 157, end_line: 162}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 170, end_line: 173}
+    evidence_class: Inferred
+    flags: [logic_flaw]
+
+  - id: BR-029
+    type: rule
+    statement: >-
+      Report 615 filters on ApprDate BETWEEN FromDate AND ToDate. ApprDate is a datetime with a time of day
+      (set from GETDATE()), and ToDate is a date. So COs approved on the ToDate after midnight are left out:
+      the last day of the range is effectively excluded.
+    locations:
+      - {file: Scripts/Reports/615.sql, start_line: 42, end_line: 42}
+      - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 14, end_line: 15}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 96, end_line: 96}
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 141, end_line: 141}
+    evidence_class: Inferred
+    flags: [logic_flaw]
+
+  - id: BR-030
+    type: rule
+    statement: >-
+      Owner COs are supposed to have the owner's countersigned copy on file (OwnerSignDate) before approval
+      (contract admin policy 2012). This is only a comment. No code reads or sets OwnerSignDate.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 163, end_line: 165}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 105, end_line: 105}
+    evidence_class: Confirmation Required
+    flags: [comment_only]
+
+  - id: BR-031
+    type: rule
+    statement: >-
+      Fee on fee (our markup applied on top of the sub's own markup when JCCoParm.FeeOnFeeYN = 'Y') is
+      obsolete. clsJCCOBL.ApplyFeeOnFee has no callers. FeeOnFeeYN is seeded 'N' and is read by GetCoParms
+      but never used. The comment says owner contracts stopped allowing it in 2011.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 225, end_line: 235}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 24, end_line: 24}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 50, end_line: 51}
+    evidence_class: Inferred
+    flags: [dead_code]
+
+  - id: BR-032
+    type: rule
+    statement: >-
+      Posting (A -> I, usp_JCCOInterface). An owner CO adds TotalAmt to JCJob.RevContract. A sub CO adds
+      CostAmt (cost only, no markup or tax) to SLHdr.CurCost and writes JCCommit rows summed by phase and
+      cost type, which AP uses to match sub invoices. An internal CO posts nothing; only its status changes.
+      Posting is blocked on hard-closed jobs.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 3, end_line: 9}
+      - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 49, end_line: 68}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 116, end_line: 129}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 182, end_line: 195}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-033
+    type: rule
+    statement: >-
+      Field request intake (clsJCFieldSync.ProcessRequest + usp_JCCOFieldImport) creates a Draft CO with
+      SourceSys 'FLD', EntBy 'FIELDAPI' and the company default markup. Limits: 1-20 items, and total item
+      cost (before markup and tax) at most JCCoParm.FieldMaxAmt ($25,000), checked in VB and the proc.
+      extRef must be a 36-char GUID. A repeated extRef returns the existing CO (DUPLICATE), backed by a
+      filtered unique index.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 126, end_line: 234}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 35, end_line: 40}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 74}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 22, end_line: 22}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 119, end_line: 120}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 53, end_line: 53}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-034
+    type: rule
+    statement: >-
+      Field export (clsJCFieldSync.ExportApproved) sends Approved and Interfaced COs that are not Internal
+      and not yet exported (ExpFlag 'N'). It POSTs them as JSON in batches of up to 50 with an X-Api-Key
+      header, and marks each CO exported only when the response is HTTP 200 or 202. The first failure stops
+      the run, and the rest is retried on the next run. Each CO is exported once, so later changes (e.g.
+      void) are never re-sent.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 40, end_line: 115}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 278, end_line: 287}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-035
+    type: rule
+    statement: >-
+      Approval queue: shows Pending COs for jobs where the user is the ProjMgr or ProjExec, ordered by
+      SubmitDate. Only VP and CFO see the "Show All" option for every job.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 269, end_line: 276}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 44, end_line: 51}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-036
+    type: rule
+    statement: >-
+      Subcontract maintenance: retainage must be 0-10% (UI and DB check). The CO limit percent is 0-50%
+      (UI only; blank means company default). A subcontract with Draft, Pending or Approved COs cannot be
+      closed (status 2); only the UI checks this, and Complete (1) is not checked.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCSubcontractMaint.vb, start_line: 86, end_line: 106}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 70, end_line: 70}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 304, end_line: 308}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-037
+    type: rule
+    statement: >-
+      Header validation on save: description is required (max 60), the reason code must be active (ALW is
+      inactive), the request date cannot be in the future, the schedule extension is 0-365 days (also a DB
+      check), and there must be at least one item, each with a phase and a cost type of L/M/E/S/O.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 83, end_line: 100}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 112, end_line: 139}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 115, end_line: 115}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 140, end_line: 140}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 223, end_line: 228}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # STATES
+  # ===========================================================================
+
+  - id: ST-001
+    type: state
+    statement: >-
+      CO status codes: D Draft, P Pending Approval, A Approved, R Rejected, V Void, I Interfaced (posted).
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 77, end_line: 78}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 113, end_line: 113}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 14, end_line: 20}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 86, end_line: 96}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-002
+    type: state
+    statement: >-
+      Allowed status transitions (trigger): D>P, D>A, D>V, P>A, P>R, R>D, R>V, A>I, A>V. Anything else
+      raises an error. clsJCCOBL.IsTransitionAllowed claims to mirror the trigger but leaves out D>A, which
+      is the path used by T&M auto-approval and Save & Approve. It has no callers.
+    locations:
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 39, end_line: 49}
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 200, end_line: 210}
+    evidence_class: Verified
+    flags: [inconsistency]
+
+  - id: ST-003
+    type: state
+    statement: >-
+      Status names exposed to the field app: D RECEIVED, P PENDING, A and I APPROVED, R REJECTED,
+      V VOID, anything else UNKNOWN.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 237, end_line: 249}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-004
+    type: state
+    statement: >-
+      Job status: 1 open, 2 soft closed, 3 hard closed. Subcontract status: 0 open, 1 complete, 2 closed.
+      Contract types: LS, TM, CP, GMP.
+    locations:
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 31, end_line: 32}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 53, end_line: 53}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 27, end_line: 30}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # WORKFLOWS
+  # ===========================================================================
+
+  - id: WF-001
+    type: workflow
+    statement: >-
+      Office lifecycle. Entry Save creates a Draft: the number is assigned, the header inserted, items
+      replaced and preview totals stored. Submit calls usp_JCCOSubmit, which recomputes, validates and moves
+      the CO to Pending, or to Approved for T&M owner COs. The approval screen calls usp_JCCOApprove to
+      approve or reject. Post calls usp_JCCOInterface (A -> I) to update the contract or subcontract.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 214, end_line: 266}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 77, end_line: 129}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 123}
+    evidence_class: Verified
+    flags: []
+
+  - id: WF-002
+    type: workflow
+    statement: >-
+      Field lifecycle: the field app sends a request, ProcessRequest validates it, usp_JCCOFieldImport
+      creates a Draft (FLD), the CO is approved in the office, and ExportApproved sends it back to the field
+      service once it is A or I. The field service can poll GetStatus by job and CO number.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 3, end_line: 13}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 236, end_line: 246}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # EXCEPTIONS
+  # ===========================================================================
+
+  - id: EX-001
+    type: exception
+    statement: >-
+      usp_JCCOSubmit return codes: 1 not found, 2 not Draft, 6 job hard closed, 7 no items, 8 markup over
+      company max, 9 VAL not a deduct, 10 sub CO past notice period. The entry screen shows the proc message
+      for every nonzero code except 99.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 12, end_line: 14}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 256, end_line: 264}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-002
+    type: exception
+    statement: >-
+      usp_JCCOApprove return codes: 1 not found, 2 not pending, 3 not authorized (role or SoD), 4 over limit,
+      5 reason required, 11 subcontract not open, 12 insurance expired or missing, 13 over subcontract CO cap.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 13, end_line: 15}
+      - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 87, end_line: 96}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-003
+    type: exception
+    statement: >-
+      SQL exceptions in DAL proc calls become return code 99 with the raw error text. Direct SQL calls return
+      False with LastError set. Trigger violations raise severity 11 and roll back the transaction.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 348, end_line: 352}
+      - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 81, end_line: 83}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-004
+    type: exception
+    statement: >-
+      It is unknown how field-imported Drafts get submitted. The entry screen only creates new COs; no
+      screen loads an existing CO for editing or submitting. The same gap applies to reworking a rejected CO
+      in a later session.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 236}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+    evidence_class: Unknown
+    flags: []
+
+  - id: EX-005
+    type: exception
+    statement: >-
+      The corpus does not show how ProcessRequest/GetStatus are hosted or authenticated for inbound calls.
+      There is only a comment about a scheduled task, and outbound calls use an X-Api-Key header.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 3, end_line: 13}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 103, end_line: 103}
+    evidence_class: Unknown
+    flags: []
+
+  - id: EX-006
+    type: exception
+    statement: >-
+      CO numbering race. The entry form gets the next number (usp_JCCONextNum, whose UPDLOCK only lasts for
+      that call) and then inserts the header on a separate connection. Two users saving at the same moment
+      can get the same number, and the second save fails on the primary key.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 236}
+      - {file: Scripts/StoredProcedures/usp_JCCONextNum.sql, start_line: 27, end_line: 29}
+    evidence_class: Inferred
+    flags: []
+
+  - id: EX-007
+    type: exception
+    statement: >-
+      Header edits after the first save are lost. SaveCO inserts the header only when there is no CO number
+      yet. Later saves replace the items and totals, but there is no UPDATE of description, type, reason,
+      markup, SL, request date or days extension.
+    locations:
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 228, end_line: 241}
+    evidence_class: Inferred
+    flags: [logic_flaw]
+
+  - id: EX-008
+    type: exception
+    statement: >-
+      Field request errors: malformed JSON or validation failures give REJECTED with a list of error codes
+      (REQUIRED, INVALID, LIMIT). Proc results map to NOT_FOUND (2), JOB_CLOSED (3), DB_ERROR (99), and
+      INVALID for anything else (4 reason, 5 limit). A daysExtension outside 0-365 is not checked in VB and
+      fails the DB check as DB_ERROR.
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 214, end_line: 233}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 115, end_line: 115}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 260, end_line: 260}
+    evidence_class: Verified
+    flags: []

@@ -1,0 +1,219 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Human labels for 15 of the 48 ap-invoices answer-key items, against the
+# ap-invoices-demo bottled spec. Used by score.py --golden to report judge error.
+#
+# Selection: all 7 seeded traps (BR-018..BR-021, BR-027..BR-029), the three
+# Unknown exceptions (EX-005..EX-007, where "the code is absent" is hardest to
+# judge), and five ordinary Verified items as controls. That deliberately
+# over-samples the hard cases, so agreement here is a lower bound on agreement
+# over the whole key.
+#
+# Labelling rule (see TEMPLATE.yaml):
+#   full    - the essential operative claim is recoverable from the requirement
+#             text without adding information the spec does not contain
+#   partial - touched but blurred, hedged, half-stated or contradicted
+#   missed  - not addressed at all
+
+spec: output/ap-invoices-demo/bottled_spec/bottled_spec.md
+spec_sha256: bb0ee9d491720c4c63a398044e6511010750181c18d2081d6dee4a20fc423d44
+key: synthetic-corpus/ap-invoices/ANSWER_KEY.yaml
+corpus: ap-invoices
+labelled_by: reviewer-1
+labelled_on: 2026-10-06
+method: >-
+  For each item I read the answer-key statement, then pulled every requirement in
+  the bottled spec whose text mentions the item's subject (via
+  score.load_findings(spec, "requirements") filtered on keywords), then read the
+  cited source lines in synthetic-corpus/ap-invoices to check the spec's claim
+  against the code. Labels were fixed before any judge run on this branch.
+
+key_items:
+
+  - id: BR-015
+    expected_coverage: full
+    spec_requirements: [DT-0013, RL-0013, TS-0017]
+    source_checked: ["ClientSide/AP/AP/clsAPInvoiceBL.vb:143-167",
+                     "Scripts/StoredProcedures/usp_APRetgCompute.sql:41-43"]
+    basis: >-
+      DT-0013 states half-away-from-zero to the cent, matching SQL ROUND rather
+      than .NET banker's rounding, and names the production bug. TS-0017 adds
+      that it applies to RoundAmt/ComputeLineRetg/ComputeHdrRetg, i.e. per line
+      before summing. Nothing to add.
+
+  - id: BR-018
+    expected_coverage: full
+    spec_requirements: [DT-0035, RL-0052, EX-0036, PM-0038, ST-0008]
+    source_checked: ["Scripts/StoredProcedures/usp_APInvPost.sql:73-78",
+                     "ClientSide/AP/AP/frmAPInvoiceEntry.vb:82"]
+    basis: >-
+      Trap db_only. Five requirements state the rule, the rcode 12 message and
+      that it is "enforced in usp_APInvPost". The enforcement layer is therefore
+      explicit, which is the operative half of the trap. The spec never claims
+      the UI validates it, so a reader is not misled.
+
+  - id: BR-019
+    expected_coverage: full
+    spec_requirements: [RL-0050]
+    source_checked: ["ClientSide/AP/AP/clsAPInvoiceBL.vb:283-293",
+                     "ClientSide/AP/AP/clsAPInvoiceDAL.vb:310-324"]
+    basis: >-
+      Trap dead_code. RL-0050 is titled "(Deprecated)", states the 2%/10-day
+      terms, that APPayTerms superseded it in 2011, and that it "SHOULD NOT be
+      relied upon or invoked". It hedges on whether a caller remains ("TBD"),
+      which is weaker than the key's "no callers", but the actionable claim --
+      do not carry this forward -- is fully stated.
+
+  - id: BR-020
+    expected_coverage: partial
+    spec_requirements: [DT-0019, DL-0025, TS-0005, WF-0013, ST-0023]
+    source_checked: ["ClientSide/AP/AP/modAPGlobals.vb:41-44",
+                     "ClientSide/AP/AP/clsAPInvoiceBL.vb:181-185",
+                     "Scripts/StoredProcedures/usp_APInvPost.sql:123-129",
+                     "ClientSide/AP/AP/frmAPInvoiceEntry.Designer.vb:68-72"]
+    basis: >-
+      Trap inconsistency, and the one label where I disagree with the judge.
+      The key's essential claim is that the UI boundary is >= and the proc
+      boundary is strictly >, so an invoice of exactly $10,000.00 is reported as
+      needing approval on screen and auto-approved by the database. The source
+      confirms it: clsAPInvoiceBL.RequiresApproval returns GrossAmt >=
+      APPR_THRESHOLD, usp_APInvPost routes on @GrossAmt > ISNULL(@ApprThreshold,
+      10000). No requirement states that divergence. Worse, DT-0019 and WF-0013
+      assert ">= $10,000" as THE rule and ST-0023 writes the proc's own rule as
+      "GrossAmt > threshold" in one entry and "at or above" in another, so the
+      spec contradicts itself without flagging it. DL-0025 does capture the
+      second half (hardcoded APPR_THRESHOLD vs configurable
+      APCoParm.ApprThreshold, "risking drift"), which is why this is partial and
+      not missed.
+
+  - id: BR-021
+    expected_coverage: full
+    spec_requirements: [RL-0014, EX-0023]
+    source_checked: ["ClientSide/AP/AP/clsAPInvoiceBL.vb:150-159",
+                     "Scripts/Tables/AP_Tables.sql:46"]
+    basis: >-
+      Trap comment_only. RL-0014's title is "Should Be Exempt From Retainage
+      (Unenforced)" and the text says the policy is implemented only by manually
+      setting DfltRetgPct to zero and is not enforced, citing the 2014 Controller
+      memo. EX-0023 adds that VendType = 'U' triggers no code path. Complete.
+
+  - id: BR-026
+    expected_coverage: full
+    spec_requirements: [RL-0004, EX-0033]
+    source_checked: ["ClientSide/AP/AP/clsAPInvoiceBL.vb:68-71"]
+    basis: >-
+      RL-0004 states the >365-day warning is non-blocking and
+      "informational only (Debug.WriteLine), not surfaced to the user". EX-0033
+      adds the 2009-style audit rationale and a TBD on whether the warning
+      reaches any audit trail. That is the key's claim, including the part that
+      users never see it.
+
+  - id: BR-027
+    expected_coverage: full
+    spec_requirements: [EX-0010, DL-0011]
+    source_checked: ["ClientSide/AP/AP/frmAPInvoiceApproval.vb:42-53",
+                     "Scripts/StoredProcedures/usp_APInvApprove.sql:72-103"]
+    basis: >-
+      EX-0010 states the queue filter applies only when role = ROLE_PM and
+      "Show All" is unchecked, and that any user with Show All checked sees the
+      unfiltered queue; its "If violated" says PMs could approve invoices for
+      jobs they do not manage. So "the PM-to-job link does not actually restrict
+      approval" is recoverable without adding information. It does not say in
+      so many words that usp_APInvApprove never checks the assignment, but no
+      requirement claims it does either.
+
+  - id: BR-028
+    expected_coverage: partial
+    spec_requirements: [EX-0018, DL-0025, DT-0046, DL-0005]
+    source_checked: ["ClientSide/AP/AP/modAPGlobals.vb:49-63",
+                     "Scripts/Tables/AP_Tables.sql:86-96",
+                     "ClientSide/AP/AP/frmAPInvoiceEntry.vb:165"]
+    basis: >-
+      Trap inconsistency (latent), two parts. The lien-waiver part is stated:
+      EX-0018 calls the $5,000 entry-screen threshold "hardcoded". The role-limit
+      part is not: DT-0046 and DL-0005 present APApprLim as configurable data and
+      list the same numbers, with no statement that modAPGlobals keeps a
+      hardcoded copy that can drift from the table. Half a two-part claim.
+
+  - id: BR-029
+    expected_coverage: full
+    spec_requirements: [DT-0047, DL-0018, RL-0027, EX-0008]
+    source_checked: ["Scripts/StoredProcedures/usp_APHoldRelease.sql:110-111",
+                     "Scripts/Tables/AP_Tables.sql:23",
+                     "ClientSide/AP/AP/frmAPInvoiceApproval.vb:127-131"]
+    basis: >-
+      Trap dead_code (secondary), two parts, both stated. DT-0047 and DL-0018
+      both annotate the APCoParm attribute as "MgrHoldDays (unused)", and RL-0027
+      / EX-0008 are devoted to the bulk "Approve All" capability being
+      deliberately removed.
+
+  - id: BR-030
+    expected_coverage: full
+    spec_requirements: [DL-0024, DL-0009, TS-0026, WF-0028]
+    source_checked: ["Scripts/Reports/412.sql:23-33",
+                     "Reports/AP Accounts Payable/AP Open Payables by Job (412).txt:30-50"]
+    basis: >-
+      DL-0024 gives the OpenPayable formula and "Payable Now = 0 when
+      PayBlocked='Y' or Status<>'A'"; DL-0009 defines PayBlocked as any open
+      non-RET hold; WF-0028 covers the as-of date, aging buckets and retainage.
+      All the operative content.
+
+  - id: ST-005
+    expected_coverage: full
+    spec_requirements: [DL-0003, DT-0032, EX-0038]
+    source_checked: ["ClientSide/AP/AP/modAPGlobals.vb:19",
+                     "Scripts/Tables/AP_Tables.sql:132"]
+    basis: >-
+      DL-0003 lists "Paid ('X') - final" and EX-0038 treats X as terminal. The
+      key's parenthetical ("legacy cleared code", "nothing in this corpus sets
+      X") is provenance for the state, not the state's own rule; the item's
+      operative claim is that X exists and is final.
+
+  - id: ST-100
+    expected_coverage: full
+    spec_requirements: [ST-0022, EX-0038, DT-0030]
+    source_checked: ["Scripts/Triggers/trg_APInvHdr_u.sql:39-67",
+                     "ClientSide/AP/AP/clsAPInvoiceBL.vb:265-281"]
+    basis: >-
+      ST-0022 and EX-0038 both write out the exact whitelist O->P/A/V,
+      P->A/O/V, A->H/X/V, H->A/V, note that X and V are terminal (so H->X is
+      absent), and say the trigger mirrors clsAPInvoiceBL.IsTransitionAllowed.
+
+  - id: EX-005
+    expected_coverage: full
+    spec_requirements: [EX-0035]
+    source_checked: ["ClientSide/AP/AP/frmAPInvoiceEntry.vb:200-209"]
+    basis: >-
+      EX-0035 states that a failed line insert after a successful header insert
+      leaves a header with no lines, that there is no transaction around the
+      two, and that recovery relies on a nightly batch cleanup job. It presents
+      the cleanup job as real where the key calls it unverified (the source has
+      only a TODO comment), but the operative claim -- orphaned headers are
+      possible and are not rolled back -- is fully stated.
+
+  - id: EX-006
+    expected_coverage: missed
+    spec_requirements: []
+    source_checked: ["Scripts/Triggers/trg_APInvHdr_u.sql:56-67",
+                     "ClientSide/AP/AP/clsAPInvoiceBL.vb:232-263"]
+    basis: >-
+      Nothing in the spec addresses the absent payment process. Searching the 317
+      requirements for "check run", "EFT", "PaidAmt" and "payment process"
+      returns entity definitions that list PaidAmt as an attribute and the
+      report's use of it, but no requirement observes that nothing in the corpus
+      moves A->X or that it is therefore unknown whether the payment run
+      re-checks lien waiver and insurance. Absent code is not reasoned about.
+
+  - id: EX-007
+    expected_coverage: missed
+    spec_requirements: []
+    source_checked: ["Scripts/StoredProcedures/usp_APInvApprove.sql:63-65",
+                     "ClientSide/AP/AP/frmAPInvoiceEntry.vb:150-153"]
+    basis: >-
+      The spec covers rejection itself (EX-0006: reason required, ApprBy/ApprDate
+      cleared, PostedYN reset) but not the gap. EX-0006 even asserts that
+      rejection "returns the invoice to the preparer's queue", which the corpus
+      does not contain: frmAPInvoiceEntry only creates new invoices and refuses
+      to re-save a posted one. The unknown -- how a rejected invoice is actually
+      corrected -- is never raised.

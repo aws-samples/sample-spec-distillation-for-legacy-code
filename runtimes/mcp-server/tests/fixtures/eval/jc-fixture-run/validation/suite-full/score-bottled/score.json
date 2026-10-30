@@ -1,0 +1,592 @@
+{
+ "scorer_version": "2026-10-06.hardened-1",
+ "spec": "output/jc-fixture-run/bottled_spec/bottled_spec.md",
+ "key": "eval/keys/jc-changeorders/ANSWER_KEY.yaml",
+ "source_root": "synthetic-corpus/jc-changeorders",
+ "method": "llm",
+ "counts": {
+  "key_items": 51,
+  "core_items": 0,
+  "findings": 1496,
+  "citations": 986
+ },
+ "recall": {
+  "strict_full_pct": 78.4,
+  "partial_credit_pct": 86.3,
+  "any_match_pct": 94.1,
+  "core_full_pct": null,
+  "core_any_pct": null,
+  "full": 40,
+  "partial": 8,
+  "missed": 3
+ },
+ "precision": {
+  "keyed_pct": 80.7,
+  "correct_pct": 84.1,
+  "keyed_pct_of_decided": 87.6,
+  "findings_matched": 1208,
+  "correct_extra": 50,
+  "unsupported": 119,
+  "incorrect": 17,
+  "uncertain": 117,
+  "unjudged": 0,
+  "decided": 1379
+ },
+ "citations": {
+  "validity_pct": 100.0,
+  "valid": 986,
+  "invalid": 0,
+  "off_by_one": 0,
+  "validity_pct_allowing_off_by_one": 100.0,
+  "by_category": {
+   "ok": 986,
+   "off_by_one_end": 0,
+   "phantom_line_only": 0,
+   "out_of_range": 0,
+   "file_not_found": 0,
+   "bad_range": 0,
+   "no_file_context": 0
+  },
+  "accuracy_pct": 51.9,
+  "accuracy_num": 759,
+  "accuracy_den": 1463,
+  "findings_without_citation": 724
+ },
+ "source_coverage": {
+  "source_lines": 2551,
+  "source_lines_cited": 1821,
+  "source_line_coverage_pct": 71.4,
+  "files_never_cited": [],
+  "files_never_cited_n": 0,
+  "key_locations": {
+   "total": 191,
+   "cited": 176,
+   "pct": 92.1,
+   "items_with_any_location_cited": 50,
+   "items_fully_cited": 37
+  }
+ },
+ "structural": {
+  "requirement_ids_defined": 386,
+  "duplicate_requirement_ids": [],
+  "duplicate_requirement_ids_n": 0,
+  "unresolved_cross_references": [],
+  "unresolved_cross_references_n": 0,
+  "answer_key_ids_mentioned": [],
+  "requirements_without_citation": [],
+  "requirements_without_citation_n": 0,
+  "requirement_units": 0,
+  "orphan_citations": null,
+  "orphan_citations_applicable": false,
+  "orphan_citation_findings": [],
+  "index_entries_without_definition": [],
+  "index_entries_without_definition_n": 0,
+  "thin_requirements": [],
+  "thin_requirements_n": 0,
+  "malformed": {
+   "heading_level_jumps": [],
+   "heading_level_jumps_n": 0,
+   "empty_sections": [],
+   "empty_sections_n": 0,
+   "duplicate_headings_n": 129,
+   "unclosed_code_fence": false
+  }
+ },
+ "possible_inventions": [
+  {
+   "finding_id": "F62",
+   "verdict": "incorrect",
+   "note": "Finding says 'PM only' but code (line 171) allows any role other than ENTRY or blank, contradicting that claim.",
+   "invalid_citations": [],
+   "text": "RL-0016 | Rule: Small Change Orders Allow One-Step Save-and-Approve for PMs | Business Rules | ClientSide/JC/JC/clsJCCOB"
+  },
+  {
+   "finding_id": "F219",
+   "verdict": "incorrect",
+   "note": "Trigger blocks void when ExpFlag='Y' (exported), not when 'executive-required'. The finding mischaracterizes the condition.",
+   "invalid_citations": [],
+   "text": "EX-0031 | Edge Case: Approved Change Order Cannot Be Voided Once Marked Executive-Required | Edge Cases and Operational "
+  },
+  {
+   "finding_id": "F261",
+   "verdict": "incorrect",
+   "note": "Finding says 'creator cannot self-approve above quick-approve threshold' but code shows exec label and Save&Approve visibility, not a self-approval block.",
+   "invalid_citations": [],
+   "text": "PM-0036 | Access Rule: Creator Cannot Self-Approve Above Quick-Approve Threshold | Business Object Model | ClientSide/JC"
+  },
+  {
+   "finding_id": "F578",
+   "verdict": "incorrect",
+   "note": "Claims all three statuses block COs; BR-019 shows soft-closed (2) only blocked by UI/BL, not by submit/import/interface procs.",
+   "invalid_citations": [],
+   "text": "#### [DL-0022] Qualifier: Job Status\n**Requirement:** The system SHALL classify each job as Open (1), SoftClosed (2), or"
+  },
+  {
+   "finding_id": "F640",
+   "verdict": "incorrect",
+   "note": "Finding says PM allowed at <= threshold; BR-009 and proc use > (PM blocked at >= 50000 by BL, > by proc).",
+   "invalid_citations": [],
+   "text": "#### [PM-0013] Role: Project Manager (PM)\n**Requirement:** The system SHALL allow the PM role to approve change orders w"
+  },
+  {
+   "finding_id": "F648",
+   "verdict": "incorrect",
+   "note": "Finding restricts quick-approve to PM only; code (clsJCCOBL L171) allows any role except ENTRY or blank.",
+   "invalid_citations": [],
+   "text": "#### [PM-0021] Permission: Quick (One-Step) Approval for Minor Change Orders\n**Requirement:** The system SHALL permit a "
+  },
+  {
+   "finding_id": "F807",
+   "verdict": "incorrect",
+   "note": "Void reason is enforced by both BL (clsJCCOBL.CanVoid) AND the DB trigger, not BL only.",
+   "invalid_citations": [],
+   "text": "- See [EX-0029] Edge Case: Void Requires Reason, Enforced Only via BL Check (specified in Edge Cases and Operational Lea"
+  },
+  {
+   "finding_id": "F809",
+   "verdict": "incorrect",
+   "note": "No such rule exists in source. Approved COs can be voided unless exported (ExpFlag=Y); exec-required flag is irrelevant.",
+   "invalid_citations": [],
+   "text": "- See [EX-0031] Edge Case: Approved Change Order Cannot Be Voided Once Marked Executive-Required (specified in Edge Case"
+  },
+  {
+   "finding_id": "F826",
+   "verdict": "incorrect",
+   "note": "IsAdminUser checks admin status for override mode, not for 'Show All' queue. BR-035 says VP/CFO see Show All, not admins.",
+   "invalid_citations": [],
+   "text": "#### [WF-0002] Actor: System Administrator / Admin User\n**Requirement:** The system SHALL support a privileged administr"
+  },
+  {
+   "finding_id": "F854",
+   "verdict": "incorrect",
+   "note": "Finding conflates field export (ExportApproved) with accounting interface (usp_JCCOInterface); these are separate processes.",
+   "invalid_citations": [],
+   "text": "#### [WF-0030] Workflow: Change Order Interfacing to Accounting\n**Requirement:** The system SHALL find all approved, not"
+  },
+  {
+   "finding_id": "F856",
+   "verdict": "incorrect",
+   "note": "usp_JCCOInterface does not set ExpFlag='Y' or ExpDate; those are set by MarkExported in the field export path.",
+   "invalid_citations": [],
+   "text": "#### [WF-0032] Action: Post (Interface) Approved Change Order to Job and Subcontract\n**Requirement:** The system SHALL, "
+  },
+  {
+   "finding_id": "F874",
+   "verdict": "incorrect",
+   "note": "Entry form blocks any non-open job (soft+hard closed), but finding omits that procs only block hard-closed jobs.",
+   "invalid_citations": [],
+   "text": "#### [RL-0009] Rule: Change Orders Cannot Be Added to Closed Jobs\n**Requirement:** The system SHALL require the job to b"
+  },
+  {
+   "finding_id": "F896",
+   "verdict": "incorrect",
+   "note": "Finding claims client-side IsTransitionAllowed is kept in sync with trigger, but ST-002 notes it omits D>A and has no callers.",
+   "invalid_citations": [],
+   "text": "#### [RL-0031] Rule: Change Order Status Transitions Are Restricted to a Defined Set\n**Requirement:** The system SHALL p"
+  },
+  {
+   "finding_id": "F918",
+   "verdict": "incorrect",
+   "note": "Finding claims insurance check is not bypassable via Override; BR-025 states SoD/status/subcontract checks still apply with override, but the source shows insurance IS a subcontract check that still applies.",
+   "invalid_citations": [],
+   "text": "#### [RL-0053] Rule: Subcontractor Insurance Must Be Current to Approve a Subcontract Change Order\n**Requirement:** The "
+  },
+  {
+   "finding_id": "F951",
+   "verdict": "incorrect",
+   "note": "ExpFlag='Y' means exported to field app, not 'executive approval'. The finding misidentifies the flag's meaning.",
+   "invalid_citations": [],
+   "text": "#### [RL-0086] Constraint: Certain Approved Change Orders Cannot Be Voided\n**Requirement:** A change order whose PriorSt"
+  },
+  {
+   "finding_id": "F1014",
+   "verdict": "incorrect",
+   "note": "OvrFlag is set by the approval override path, not by TotalAmt > threshold on save. No such trigger/logic exists in source.",
+   "invalid_citations": [],
+   "text": "#### [EX-0008] Edge Case: Change Order Can Be Marked Over-Threshold Without Blocking Entry\n**Requirement:** The system S"
+  },
+  {
+   "finding_id": "F1196",
+   "verdict": "incorrect",
+   "note": "Claims SourceSys='ERP' at insert; code sets SourceSys='FLD' for field imports, not 'ERP'.",
+   "invalid_citations": [],
+   "text": "#### [IF-0038] Capability: Field App Change Order Submission\n**Requirement:** The system SHALL provide a distinct integr"
+  }
+ ],
+ "key_coverage": {
+  "BR-001": "full",
+  "BR-002": "full",
+  "BR-003": "partial",
+  "BR-004": "partial",
+  "BR-005": "full",
+  "BR-006": "full",
+  "BR-007": "full",
+  "BR-008": "full",
+  "BR-009": "full",
+  "BR-010": "full",
+  "BR-011": "full",
+  "BR-012": "full",
+  "BR-013": "full",
+  "BR-014": "full",
+  "BR-015": "full",
+  "BR-016": "full",
+  "BR-017": "full",
+  "BR-018": "full",
+  "BR-019": "partial",
+  "BR-020": "full",
+  "BR-021": "full",
+  "BR-022": "full",
+  "BR-023": "full",
+  "BR-024": "full",
+  "BR-025": "full",
+  "BR-026": "full",
+  "BR-027": "partial",
+  "BR-028": "partial",
+  "BR-029": "partial",
+  "BR-030": "full",
+  "BR-031": "full",
+  "BR-032": "full",
+  "BR-033": "full",
+  "BR-034": "full",
+  "BR-035": "full",
+  "BR-036": "full",
+  "BR-037": "full",
+  "ST-001": "full",
+  "ST-002": "full",
+  "ST-003": "full",
+  "ST-004": "full",
+  "WF-001": "full",
+  "WF-002": "full",
+  "EX-001": "full",
+  "EX-002": "full",
+  "EX-003": "missed",
+  "EX-004": "missed",
+  "EX-005": "partial",
+  "EX-006": "partial",
+  "EX-007": "missed",
+  "EX-008": "full"
+ },
+ "recall_by": {
+  "type": {
+   "exception": {
+    "n": 8,
+    "full": 3,
+    "partial": 2,
+    "missed": 3,
+    "full_pct": 37.5,
+    "any_pct": 62.5
+   },
+   "rule": {
+    "n": 37,
+    "full": 31,
+    "partial": 6,
+    "missed": 0,
+    "full_pct": 83.8,
+    "any_pct": 100.0
+   },
+   "state": {
+    "n": 4,
+    "full": 4,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "workflow": {
+    "n": 2,
+    "full": 2,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   }
+  },
+  "evidence": {
+   "Confirmation Required": {
+    "n": 6,
+    "full": 4,
+    "partial": 2,
+    "missed": 0,
+    "full_pct": 66.7,
+    "any_pct": 100.0
+   },
+   "Inferred": {
+    "n": 7,
+    "full": 1,
+    "partial": 5,
+    "missed": 1,
+    "full_pct": 14.3,
+    "any_pct": 85.7
+   },
+   "Unknown": {
+    "n": 2,
+    "full": 0,
+    "partial": 1,
+    "missed": 1,
+    "full_pct": 0.0,
+    "any_pct": 50.0
+   },
+   "Verified": {
+    "n": 36,
+    "full": 35,
+    "partial": 0,
+    "missed": 1,
+    "full_pct": 97.2,
+    "any_pct": 97.2
+   }
+  },
+  "flag": {
+   "(none)": {
+    "n": 32,
+    "full": 28,
+    "partial": 2,
+    "missed": 2,
+    "full_pct": 87.5,
+    "any_pct": 93.8
+   },
+   "comment_only": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "db_only": {
+    "n": 2,
+    "full": 2,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "dead_code": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "duplicated_logic": {
+    "n": 3,
+    "full": 2,
+    "partial": 1,
+    "missed": 0,
+    "full_pct": 66.7,
+    "any_pct": 100.0
+   },
+   "inconsistency": {
+    "n": 7,
+    "full": 5,
+    "partial": 2,
+    "missed": 0,
+    "full_pct": 71.4,
+    "any_pct": 100.0
+   },
+   "logic_flaw": {
+    "n": 5,
+    "full": 0,
+    "partial": 4,
+    "missed": 1,
+    "full_pct": 0.0,
+    "any_pct": 80.0
+   },
+   "undocumented_feature": {
+    "n": 3,
+    "full": 3,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   }
+  }
+ },
+ "segmentation": {
+  "strategy_requested": "auto",
+  "strategy": "auto",
+  "strategy_doc": "heading sections containing an 'Evidence:'/'Citations:' line become one finding; everything else splits per bullet / paragraph / table row / code block",
+  "findings": 1496,
+  "by_kind": {
+   "entry": 386,
+   "fragment": 1110
+  },
+  "merged_entry_findings": 386,
+  "requirement_ids_in_spec": 386,
+  "finding_chars": {
+   "min": 49,
+   "median": 130.0,
+   "max": 1896,
+   "total": 501420
+  },
+  "spec_bytes": 514554,
+  "findings_truncated": 0
+ },
+ "judge": {
+  "plan": {
+   "findings": 1496,
+   "batches": 60,
+   "runs": 1,
+   "calls": 60,
+   "expected_cache_hits": 0,
+   "expected_bedrock_calls": 60,
+   "evidence_mode": "chunked",
+   "evidence_chars": {
+    "min": 16484,
+    "max": 40086,
+    "total_per_run": 2030127
+   },
+   "evidence_truncated_batches": 30,
+   "est_input_tokens": 979406,
+   "est_output_tokens": 142120,
+   "est_cost_usd": 5.07,
+   "est_cost_usd_uncached": 5.07,
+   "est_input_tokens_uncached": 979406,
+   "cache_keying": "pass-index-only/v1",
+   "model": "us.anthropic.claude-sonnet-4-6",
+   "region": "us-east-1",
+   "schema_version": "2026-10-06.1",
+   "schema_hash": "56331fbe30e27358",
+   "temperature": 0.0,
+   "cache_enabled": true
+  },
+  "runs": 1,
+  "model": "us.anthropic.claude-sonnet-4-6",
+  "schema_version": "2026-10-06.1",
+  "schema_hash": "56331fbe30e27358",
+  "temperature": 0.0,
+  "evidence_mode": "chunked",
+  "evidence_truncated_batches": 30,
+  "cache": {
+   "enabled": true,
+   "hits": 0,
+   "misses": 62,
+   "writes": 62,
+   "hit_rate_pct": 0.0
+  },
+  "issues": [
+   {
+    "kind": "schema_violation",
+    "tag": "judge:bottled_spec:r1:b41",
+    "error": "$.judgments[8].note: string longer than 400"
+   },
+   {
+    "kind": "schema_violation",
+    "tag": "judge:bottled_spec:r1:b45",
+    "error": "$.judgments[8].note: expected string, got NoneType"
+   }
+  ],
+  "issues_n": 2,
+  "consensus_rule": "a verdict or key match needs strictly more than half the passes; otherwise the finding is reported as 'uncertain' / no-majority",
+  "determinism": {
+   "temperature": 0.0,
+   "key_items_sorted": true,
+   "findings_sorted": true,
+   "pass_salt": "the prompt differs between passes only by 'Evaluation pass k of N', so measured across-pass spread is a LOWER BOUND on judge noise"
+  },
+  "abstention": {
+   "uncertain_findings": 117,
+   "uncertain_pct": 7.8,
+   "no_majority_findings": 0
+  },
+  "agreement": {
+   "mean_per_finding": 1.0,
+   "unanimous_findings": 1496,
+   "unanimous_pct": 100.0,
+   "fleiss_kappa_verdicts": null,
+   "fleiss_kappa_verdicts_label": "undefined",
+   "fleiss_kappa_key_coverage": null,
+   "fleiss_kappa_key_coverage_label": "undefined",
+   "mean_pairwise_cohen_verdicts": null,
+   "mean_pairwise_cohen_key_coverage": null
+  },
+  "across_runs": {
+   "recall_strict_full_pct": {
+    "min": 78.4,
+    "median": 78.4,
+    "max": 78.4,
+    "runs": [
+     78.4
+    ]
+   },
+   "recall_any_match_pct": {
+    "min": 94.1,
+    "median": 94.1,
+    "max": 94.1,
+    "runs": [
+     94.1
+    ]
+   },
+   "precision_keyed_pct": {
+    "min": 80.7,
+    "median": 80.7,
+    "max": 80.7,
+    "runs": [
+     80.7
+    ]
+   },
+   "incorrect": {
+    "min": 17.0,
+    "median": 17.0,
+    "max": 17.0,
+    "runs": [
+     17.0
+    ]
+   },
+   "uncertain": {
+    "min": 117.0,
+    "median": 117.0,
+    "max": 117.0,
+    "runs": [
+     117.0
+    ]
+   }
+  },
+  "bootstrap_ci95": {
+   "basis": "percentile bootstrap resampling KEY ITEMS (recall) or FINDINGS (precision) from the majority-vote labels; it measures small-sample uncertainty, not judge noise, and does not shrink with more judge passes",
+   "iters": 2000,
+   "seed": 20261006,
+   "recall_strict_full_pct": {
+    "point": 78.4,
+    "lo": 66.7,
+    "hi": 88.2,
+    "n": 51,
+    "iters": 2000
+   },
+   "recall_any_match_pct": {
+    "point": 94.1,
+    "lo": 88.2,
+    "hi": 100.0,
+    "n": 51,
+    "iters": 2000
+   },
+   "recall_partial_credit_pct": {
+    "point": 86.3,
+    "lo": 78.4,
+    "hi": 93.1,
+    "n": 51,
+    "iters": 2000
+   },
+   "precision_keyed_pct": {
+    "point": 80.7,
+    "lo": 78.7,
+    "hi": 82.7,
+    "n": 1496,
+    "iters": 2000
+   }
+  }
+ },
+ "judge_usage": {
+  "calls": 62,
+  "cached_calls": 0,
+  "input_tokens": 1221252,
+  "output_tokens": 118856,
+  "cost_usd": 5.446596,
+  "retries": 0,
+  "schema_retries": 2,
+  "missing_retries": 0
+ },
+ "generation_usage": null,
+ "findings_reported": 1496,
+ "findings_total": 1496
+}

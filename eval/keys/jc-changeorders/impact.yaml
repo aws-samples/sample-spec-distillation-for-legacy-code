@@ -1,0 +1,288 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+#
+# Change-impact key - synthetic JC Change Orders corpus. Tests the "impact analysis" benefit: given a change
+# request, does the tool find EVERY place that must change (including every duplicated copy)?
+# Paths are relative to synthetic-corpus/jc-changeorders/. Line ranges are 1-based, inclusive.
+#
+# affected_locations: must_change = code/data that must be edited for the change to be correct everywhere
+#                     must_review = behaviour depends on it; review / retest, may not need an edit
+# affected_tests: the corpus has NO automated tests; listed entries are the manual / regression checks a
+#                 complete answer should call out (report, external contract, screens).
+# Scoring hint: recall over must_change locations is the primary metric; missing a duplicated copy is a miss.
+
+corpus: jc-changeorders
+version: 1
+
+scenarios:
+
+  - id: IMP-01
+    change: Raise the change order executive-approval threshold (PM authority) from $50,000 to $75,000.
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 18, end_line: 18, why: "COApprThreshold default"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 220, end_line: 220, why: "JCCoParm seed row (or UPDATE in prod)"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 232, end_line: 232, why: "JCCOApprLim PM row - proc also checks role MaxAmt"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 39, end_line: 42, why: "CO_PM_LIMIT hardcoded copy"}
+        - {file: Scripts/Reports/615.sql, start_line: 31, end_line: 31, why: "hardcoded 50000 ExecReq"}
+      must_review:
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 67, end_line: 68, why: "PM role limit returns CO_PM_LIMIT"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 144, end_line: 146, why: "RequiresExecApproval uses >= (boundary differs from proc)"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 158, end_line: 159, why: "message text built from CO_PM_LIMIT"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 78, end_line: 78, why: "label text"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 186, end_line: 186, why: "label visibility uses >"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 92, end_line: 92, why: "reads COApprThreshold"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 97, end_line: 106, why: "threshold and role limit checks"}
+        - {file: ClientSide/JC/JC/frmJCCOApproval.vb, start_line: 38, end_line: 38, why: "shows limit from hardcoded copy"}
+        - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 44, end_line: 44, why: "footer legend"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 91, end_line: 91, why: "requiresExecApproval in export payload"}
+    affected_rules: [BR-009, BR-010]
+    affected_reports: [615]
+    affected_external_contract: >-
+      Yes. The export field requiresExecApproval changes meaning for COs between $50k and $75k. Downstream
+      field app consumers should be told.
+    affected_tests:
+      - "approval screen boundary at 75,000.00 vs 75,000.01"
+      - "report 615 ExecReq flag"
+      - "export payload requiresExecApproval flag"
+    notes: >-
+      Fixing only the DB parameter leaves the screens, report and export on $50k. Fixing only CO_PM_LIMIT
+      leaves the proc on $50k. The JCCOApprLim PM row also caps PMs at $50k, so it must move too.
+
+  - id: IMP-02
+    change: Add a new change order type "A - Allowance reconciliation" alongside Owner / Subcontract / Internal.
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 76, end_line: 76, why: "type comment"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 112, end_line: 112, why: "ckJCCOHdr_Type CHECK"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 22, end_line: 25, why: "COTYPE constants"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 98, end_line: 105, why: "COTypeText"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 90, end_line: 96, why: "type validation"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 64, end_line: 65, why: "type combo items"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 78, end_line: 78, why: "export maps every non-S type to OWNER"}
+        - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 26, end_line: 30, why: "@TypeText group names"}
+        - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 51, end_line: 65, why: "posting branches by type - new type would post nothing"}
+      must_review:
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 126, end_line: 133, why: "SelType substring and SL enable"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 88, why: "sub markup cap keyed on S"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 100, end_line: 100, why: "notice period keyed on S"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 112, why: "TM auto-approval keyed on O"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 112, end_line: 138, why: "sub checks keyed on S"}
+        - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 3, end_line: 9, why: "posting rules doc"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 278, end_line: 282, why: "export excludes only I"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 152, end_line: 157, why: "inbound coType mapping"}
+        - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 54, end_line: 54, why: "SL check keyed on S"}
+        - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 88, end_line: 88, why: "SL stored only for S"}
+        - {file: Scripts/Reports/615.sql, start_line: 40, end_line: 40, why: "COType filter"}
+        - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 16, end_line: 16, why: "parameter doc"}
+    affected_rules: [BR-002, BR-007, BR-021, BR-023, BR-024, BR-032, BR-034]
+    affected_reports: [615]
+    affected_external_contract: >-
+      Yes. The export "type" enum (OWNER/SUB) would mislabel the new type as OWNER. Decide whether to export
+      it and add an enum value. The inbound coType enum stays OWNER/SUB unless the field app may send it.
+    affected_tests:
+      - "entry screen type combo"
+      - "submit / approve / post for the new type"
+      - "report 615 grouping"
+      - "export payload type value"
+    notes: >-
+      The ReasonCode ALW (inactive) is unrelated to COType. Do not confuse the two. Every IF @COType = 'S' /
+      'O' branch needs a decision.
+
+  - id: IMP-03
+    change: Apply markup after tax (markup on cost + tax) instead of on cost only.
+    affected_locations:
+      must_change:
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 7, end_line: 10, why: "formula doc"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 90, end_line: 92, why: "authoritative calculation"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 170, end_line: 180, why: "preview calculation (per-line)"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 49, end_line: 65, why: "CalcTotals copy"}
+        - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 32, why: "@MarkupEarned/@LineTotal recompute"}
+      must_review:
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 187, end_line: 197, why: "preview totals stored by SaveTotals (and kept for Save & Approve)"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279, why: "Save & Approve keeps preview amounts"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 88, why: "sub 5% cap interacts"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 83, end_line: 86, why: "exported cost/markup/tax/total amounts"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 225, end_line: 235, why: "dead fee-on-fee; ignore but do not \"fix\""}
+        - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 51, end_line: 53, why: "RevContract gets TotalAmt"}
+    affected_rules: [BR-003, BR-004, BR-007, BR-008, BR-032]
+    affected_reports: [615]
+    affected_external_contract: >-
+      Yes. markupAmount and totalAmount values change for taxable COs. The field contract is not changed, but
+      the semantics are.
+    affected_tests:
+      - "entry preview vs stored totals"
+      - "report 615 line totals vs TotalAmt"
+      - "revised contract after post"
+    notes: >-
+      Already-approved COs are frozen by trg_JCCOHdr_u, so there is no retroactive recompute. Decide whether
+      the report should keep recomputing or use the stored MarkupAmt.
+
+  - id: IMP-04
+    change: Lower the maximum markup from 15% to 12% (and make the UI agree with the database).
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 20, end_line: 20, why: "MaxMarkupPct default"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 114, end_line: 114, why: "ckJCCOHdr_Mkup CHECK 0-15"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 220, end_line: 220, why: "seed row"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 47, end_line: 47, why: "MAX_MARKUP_PCT = 20"}
+      must_review:
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 107, end_line: 110, why: "BL range check"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 143, end_line: 151, why: "textbox validation"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 67, end_line: 74, why: "proc check vs parameter"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 19, end_line: 19, why: "default 10% must stay <= max"}
+    affected_rules: [BR-006, BR-005]
+    affected_reports: []
+    affected_external_contract: No. Field COs use the default markup.
+    affected_tests:
+      - "enter 12.001% in the UI - should be rejected by the screen, not by a raw constraint error"
+    notes: >-
+      Existing drafts above 12% would violate a tightened CHECK. The constraint needs WITH NOCHECK, or the
+      data must be cleaned up first.
+
+  - id: IMP-05
+    change: Make the subcontract markup cap configurable and raise it from 5% to 7.5%.
+    affected_locations:
+      must_change:
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 88, why: "hardcoded 5.000 cap"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 15, end_line: 26, why: "new JCCoParm column"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 218, end_line: 220, why: "seed row"}
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 67, end_line: 67, why: "read the new parameter"}
+      must_review:
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 164, end_line: 180, why: "preview ignores the cap today"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 49, end_line: 65, why: "CalcTotals ignores the cap"}
+        - {file: "Reports/JC Job Cost/JC Approved Change Order Log (615).txt", start_line: 31, end_line: 32, why: "report recompute ignores the cap"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 49, end_line: 53, why: "GetCoParms column list"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279, why: "Save & Approve never applies the cap"}
+    affected_rules: [BR-007, BR-003, BR-027]
+    affected_reports: [615]
+    affected_external_contract: No schema change. markupAmount values for SUB COs change.
+    affected_tests:
+      - "sub CO at 10% entered - stored MarkupAmt vs preview vs report 615"
+    notes: This is a good moment to surface the cap to users. Today it is silent.
+
+  - id: IMP-06
+    change: Raise the one-step "Save & Approve" limit from $2,500 to $5,000 and restrict it to PMs as originally intended.
+    affected_locations:
+      must_change:
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 44, end_line: 45, why: "MINOR_CO_LIMIT"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 169, end_line: 173, why: "CanQuickApprove role check (allows any non-ENTRY role)"}
+      must_review:
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 187, end_line: 187, why: "button visibility"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 268, end_line: 279, why: "direct status update path"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 199, end_line: 207, why: "SetStatus bypasses usp_JCCOApprove"}
+        - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 45, end_line: 45, why: "D>A allowed"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 82, end_line: 86, why: "SoD check that the path skips"}
+    affected_rules: [BR-026, BR-027, BR-028]
+    affected_reports: [615]
+    affected_external_contract: No.
+    affected_tests:
+      - "quick approve as PX (should be refused)"
+      - "negative CO quick approve"
+      - "sub CO quick approve"
+    notes: >-
+      Raising the limit doubles the exposure of the bypass (no SoD, no proc checks, negatives always pass).
+      Consider routing through usp_JCCOSubmit + usp_JCCOApprove instead.
+
+  - id: IMP-07
+    change: Allow field requests up to $40,000 and up to 30 items.
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 22, end_line: 22, why: "FieldMaxAmt default"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 220, end_line: 220, why: "seed row"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 53, end_line: 53, why: "FIELD_MAX_ITEMS"}
+      must_review:
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 180, end_line: 183, why: "item count check"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 208, end_line: 212, why: "VB amount check"}
+        - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 74, why: "proc amount check"}
+    affected_rules: [BR-033]
+    affected_reports: []
+    affected_external_contract: Yes. The documented limits for the field app change (see field-app.yaml FA-08, FA-09).
+    affected_tests:
+      - "field request at 40,000.00 vs 40,000.01"
+      - "30 vs 31 items"
+    notes: >-
+      Field COs over $25k now more often need PM/executive approval. That routing is unchanged, but
+      approvers will see more of them.
+
+  - id: IMP-08
+    change: Lower the default subcontract CO cap from 25% to 20% and make every screen count approved-but-unposted COs.
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 21, end_line: 21, why: "DfltMaxCOPct default"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 220, end_line: 220, why: "seed row"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 180, end_line: 191, why: "CheckSubCap uses CurCost-OrigCost"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 193, end_line: 198, why: "SubCapRemaining uses CurCost-OrigCost"}
+        - {file: ClientSide/JC/JC/frmJCSubcontractMaint.vb, start_line: 66, end_line: 77, why: "ShowCapacity third copy"}
+      must_review:
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 114, end_line: 115, why: "reads MaxCOPct / default"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 129, end_line: 137, why: "authoritative cap check"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 135, end_line: 141, why: "remaining capacity label"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 219, end_line: 222, why: "save-time cap check"}
+        - {file: ClientSide/JC/JC/frmJCSubcontractMaint.vb, start_line: 92, end_line: 100, why: "UI 0-50% range for MaxCOPct"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 67, end_line: 67, why: "per-SL override column"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 247, end_line: 249, why: "seeded SLs (one already over 20% if counted differently)"}
+    affected_rules: [BR-022]
+    affected_reports: []
+    affected_external_contract: No.
+    affected_tests:
+      - "SL with approved-unposted COs - screen and proc agree"
+      - "SL maintenance capacity display"
+    notes: >-
+      Three VB copies use CurCost-OrigCost; the proc sums A+I CostAmt. All four must use the same definition.
+
+  - id: IMP-09
+    change: Add a new change order status "H - On Hold" (pending approval but paused awaiting owner pricing).
+    affected_locations:
+      must_change:
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 77, end_line: 78, why: "status doc"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 113, end_line: 113, why: "ckJCCOHdr_Stat CHECK"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 14, end_line: 20, why: "status constants"}
+        - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 86, end_line: 96, why: "StatusText"}
+        - {file: Scripts/Triggers/trg_JCCOHdr_u.sql, start_line: 44, end_line: 45, why: "allowed transitions list"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 203, end_line: 210, why: "IsTransitionAllowed copy"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 240, end_line: 249, why: "FieldStatus mapping (external)"}
+      must_review:
+        - {file: Scripts/Triggers/trg_JCCOItem_iud.sql, start_line: 21, end_line: 21, why: "item edit allowed statuses"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 269, end_line: 276, why: "approval queue Status='P'"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 304, end_line: 308, why: "open COs blocking SL close (D,P,A)"}
+        - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 278, end_line: 282, why: "export statuses"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 49, end_line: 53, why: "approve requires P"}
+        - {file: Scripts/StoredProcedures/usp_JCCOApprove.sql, start_line: 129, end_line: 131, why: "cap counts A,I"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 212, end_line: 223, why: "void rules"}
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 307, end_line: 314, why: "button enabling"}
+        - {file: Scripts/Reports/615.sql, start_line: 41, end_line: 41, why: "report status filter"}
+    affected_rules: [ST-001, ST-002, ST-003, BR-013, BR-015, BR-018, BR-035, BR-036]
+    affected_reports: [615]
+    affected_external_contract: >-
+      Yes. The field status enum gets a new value, or H maps to PENDING. Today an unmapped status returns
+      UNKNOWN.
+    affected_tests:
+      - "all transitions into / out of H"
+      - "approval queue contents"
+      - "SL close with a held CO"
+      - "field status lookup"
+    notes: Both the trigger list and the BL list must change. The BL copy is already out of sync (it lacks D>A).
+
+  - id: IMP-10
+    change: Make the closed-job rule consistent - soft-closed jobs (status 2) must reject new change orders everywhere.
+    affected_locations:
+      must_change:
+        - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 55, end_line: 59, why: "blocks only 3"}
+        - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 48, end_line: 52, why: "blocks only 3"}
+      must_review:
+        - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 114, end_line: 119, why: "already blocks 2 and 3"}
+        - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 78, end_line: 81, why: "already blocks 2 and 3"}
+        - {file: Scripts/StoredProcedures/usp_JCCOInterface.sql, start_line: 42, end_line: 47, why: "posting of already-approved COs on soft-closed jobs - decide"}
+        - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 226, end_line: 227, why: "JOB_CLOSED error code mapping"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 31, end_line: 31, why: "status definitions"}
+        - {file: Scripts/Tables/JC_Tables.sql, start_line: 242, end_line: 243, why: "seeded soft-closed job 23-077"}
+    affected_rules: [BR-019]
+    affected_reports: []
+    affected_external_contract: >-
+      Yes. Field requests for soft-closed jobs will start returning REJECTED / JOB_CLOSED (field-app.yaml
+      FA-11).
+    affected_tests:
+      - "field request on 23-077"
+      - "office submit on a soft-closed job"
+      - "post of an approved CO on a soft-closed job"
+    notes: Field drafts already created on soft-closed jobs would become un-submittable.

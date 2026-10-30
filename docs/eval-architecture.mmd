@@ -1,0 +1,26 @@
+flowchart TB
+    IN["<b>INPUT — code with known answers</b><br/>Synthetic VB.NET + SQL Server modules (AP invoices, JC change orders, ~2.5K lines each)<br/>Hidden answer keys: 99 known rules · 26 planted problems · Q&A / change-impact / app-requirement sets"]
+    PIPE["<b>SYSTEM UNDER TEST</b><br/>Spec-distillation pipeline · Claude Opus 5.5 / Sonnet 5.5 on Amazon Bedrock"]
+    OUT["<b>OUTPUT being evaluated</b><br/>Business spec · Issues & Insights · Knowledge graph · Code graph"]
+
+    EX["<b>EXACT — no AI, same result every time</b><br/>✓ every source line read once<br/>✓ every citation points at a real line<br/>✓ graph links confirmed by real parsers (Roslyn · ScriptDOM)<br/>✓ structure: no duplicates / orphans / cycles<br/>✓ mutation test: injected defects caught"]
+    JU["<b>ESTIMATED — LLM-as-a-judge (Claude on Bedrock)</b><br/>• rules found vs answer key · wrong claims<br/>• planted problems: full / partial / missed<br/>• Q&A · change impact · new-app requirements<br/><i>fixed JSON schema · cached · only relevant lines · 3 runs, majority vote</i>"]
+    TR["<b>RELIABILITY</b><br/>Judge vs human labels: 87–93% agreement<br/>Run-to-run agreement κ 0.90 · 95% confidence intervals"]
+    RES["<b>RESULT — scorecard in the viewer</b><br/>Exact panel + Estimated panel with error bars · cost · provenance (commit, model, corpus hash)"]
+
+    IN -->|code only — key is hidden| PIPE --> OUT
+    OUT --> EX
+    OUT --> JU
+    IN -. answer key .-> JU
+    TR --> JU
+    EX --> RES
+    JU --> RES
+
+    classDef box fill:#f5f7fb,stroke:#5a6b8c,color:#1d2433;
+    classDef exactc fill:#e6f4ea,stroke:#2e7d32,color:#1b3d1f;
+    classDef judgedc fill:#fff4e5,stroke:#e08a00,color:#4a2d00;
+    classDef trustc fill:#eef2ff,stroke:#3f51b5,color:#1a2357;
+    class IN,PIPE,OUT,RES box;
+    class EX exactc;
+    class JU judgedc;
+    class TR trustc;

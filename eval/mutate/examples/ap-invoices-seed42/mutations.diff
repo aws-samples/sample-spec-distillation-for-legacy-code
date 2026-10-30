@@ -1,0 +1,62 @@
+Only in synthetic-corpus/ap-invoices: ANSWER_KEY.yaml
+diff -ru synthetic-corpus/ap-invoices/ClientSide/AP/AP/clsAPInvoiceBL.vb /tmp/apref/corpus/ClientSide/AP/AP/clsAPInvoiceBL.vb
+--- synthetic-corpus/ap-invoices/ClientSide/AP/AP/clsAPInvoiceBL.vb	2026-10-06 13:21:40
++++ /tmp/apref/corpus/ClientSide/AP/AP/clsAPInvoiceBL.vb	2026-10-06 13:53:01
+@@ -163,7 +163,7 @@
+     Public Function ComputeLineRetg(ByVal LineType As Integer, ByVal Amount As Decimal, ByVal RetgPct As Decimal) As Decimal
+         If LineType <> LT_JOB Then Return 0D
+         If RetgPct <= 0D Then Return 0D
+-        Return RoundAmt(Amount * RetgPct / 100D)
++        Return Math.Min(RoundAmt(Amount * RetgPct / 100D), 5000D)
+     End Function
+ 
+     Public Function ComputeHdrRetg(ByVal dtLines As DataTable) As Decimal
+diff -ru synthetic-corpus/ap-invoices/ClientSide/AP/AP/frmAPInvoiceEntry.vb /tmp/apref/corpus/ClientSide/AP/AP/frmAPInvoiceEntry.vb
+--- synthetic-corpus/ap-invoices/ClientSide/AP/AP/frmAPInvoiceEntry.vb	2026-10-06 13:21:40
++++ /tmp/apref/corpus/ClientSide/AP/AP/frmAPInvoiceEntry.vb	2026-10-06 13:53:01
+@@ -162,7 +162,7 @@
+         End If
+ 
+         ' job invoice over lien waiver threshold w/o waiver - allowed to enter, will hold at approval
+-        If Trim(txtJob.Text) <> "" AndAlso Not chkLienWvr.Checked AndAlso gross >= 5000D Then
++        If Trim(txtJob.Text) <> "" AndAlso Not chkLienWvr.Checked AndAlso gross > 5000D Then
+             If MsgBox("No lien waiver on file. Invoice will be placed on hold until received. Continue?", _
+                       MsgBoxStyle.YesNo Or MsgBoxStyle.Question) = MsgBoxResult.No Then Exit Sub
+         End If
+diff -ru synthetic-corpus/ap-invoices/ClientSide/AP/AP/modAPGlobals.vb /tmp/apref/corpus/ClientSide/AP/AP/modAPGlobals.vb
+--- synthetic-corpus/ap-invoices/ClientSide/AP/AP/modAPGlobals.vb	2026-10-06 13:21:40
++++ /tmp/apref/corpus/ClientSide/AP/AP/modAPGlobals.vb	2026-10-06 13:53:01
+@@ -54,7 +54,7 @@
+             Case ROLE_PM
+                 Return 25000D
+             Case ROLE_CTRL
+-                Return 100000D
++                Return 150000D
+             Case ROLE_CFO
+                 Return 999999999.99D
+             Case Else
+@@ -69,6 +69,13 @@
+     Public g_ConnStr As String = ""
+ 
+     Public Function GetConn() As SqlConnection
++        Dim cn As New SqlConnection(g_ConnStr)
++        cn.Open()
++        Return cn
++    End Function
++
++    ' ---
++    Public Function GetConnLegacy() As SqlConnection
+         Dim cn As New SqlConnection(g_ConnStr)
+         cn.Open()
+         Return cn
+Only in synthetic-corpus/ap-invoices: README.md
+diff -ru synthetic-corpus/ap-invoices/Scripts/Reports/412.sql /tmp/apref/corpus/Scripts/Reports/412.sql
+--- synthetic-corpus/ap-invoices/Scripts/Reports/412.sql	2026-10-06 13:21:40
++++ /tmp/apref/corpus/Scripts/Reports/412.sql	2026-10-06 13:53:01
+@@ -49,5 +49,5 @@
+   AND   h.Status IN ('A', 'H', 'P')          -- open payables only; O not posted, X paid, V void
+   AND   (@Job IS NULL OR h.Job = @Job)
+   AND   (@IncludeHeld = 'Y' OR h.Status <> 'H')
+-  AND   h.InvDate <= @AsOfDate
++  AND   h.InvDate < @AsOfDate
+ ORDER BY ISNULL(h.Job, '(none)'), v.Name, h.InvDate

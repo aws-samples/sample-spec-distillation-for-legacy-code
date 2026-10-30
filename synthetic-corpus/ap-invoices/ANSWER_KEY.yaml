@@ -1,0 +1,671 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+#
+# ANSWER KEY - synthetic AP Invoices corpus (construction contractor ERP, VB.NET + SQL Server)
+# All file paths are relative to synthetic-corpus/ap-invoices/. Line ranges are 1-based and inclusive.
+#
+# type:            rule | state | workflow | exception
+# evidence_class:  Verified | Inferred | Unknown | Confirmation Required
+#   Verified              - the code states the behavior directly, and the layers agree
+#   Inferred              - follows from combining code paths, or from the absence of code (e.g. no callers)
+#   Unknown               - the corpus does not contain the code that would settle it
+#   Confirmation Required - the code is contradictory or the rule exists only as prose; a business owner must decide
+# flags (trap flags):  dead_code | inconsistency | comment_only | db_only
+#
+# PRIMARY seeded traps (one of each, as specified):
+#   BR-018 db_only, BR-019 dead_code, BR-020 inconsistency, BR-021 comment_only
+# Secondary / incidental traps are flagged too; see README.md.
+
+corpus: ap-invoices
+module: AP
+version: 1
+
+items:
+
+  # ===========================================================================
+  # BUSINESS RULES
+  # ===========================================================================
+
+  - id: BR-001
+    type: rule
+    statement: >-
+      When an invoice is posted, it goes to Pending Approval if its gross amount is above the company
+      approval threshold (APCoParm.ApprThreshold, default $10,000.00). Otherwise it is approved
+      automatically by SYSTEM. Credit memos (negative gross) never need approval.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 123, end_line: 140}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 17, end_line: 17}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 181, end_line: 185}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-002
+    type: rule
+    statement: >-
+      Each approver role has a maximum invoice amount it can approve: APCLK $0 (no authority),
+      PM $25,000, CTRL $100,000, CFO effectively unlimited ($999,999,999.99). The approver's limit
+      must be at least the invoice gross. The database table APApprLim is the source of truth; the
+      UI keeps a hardcoded copy.
+    locations:
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 84, end_line: 96}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 87, end_line: 98}
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 49, end_line: 63}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 194, end_line: 198}
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 64, end_line: 71}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-003
+    type: rule
+    statement: >-
+      Segregation of duties: a user cannot approve an invoice they entered (EntBy = approver).
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 80, end_line: 85}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 187, end_line: 193}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-004
+    type: rule
+    statement: >-
+      Only a Pending Approval invoice can be rejected, and the rejection needs a reason. Rejecting
+      sends the invoice back to Open, marks it unposted, saves RejReason and clears ApprBy and
+      ApprDate. The proc does not check the rejecting user's role; only the UI stops AP clerks.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 51, end_line: 67}
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 102, end_line: 117}
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 34, end_line: 38}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-005
+    type: rule
+    statement: >-
+      Retainage is calculated per line, only on job-cost lines (LineType 1), as Amount x RetgPct / 100.
+      Tax is never retained. Expense and other lines carry 0% and $0. The header RetgAmt is the sum of
+      the line retainage and is never recalculated from the header total. The default RetgPct comes
+      from the vendor (APVend.DfltRetgPct), else the company default (APCoParm.DfltRetgPct, 10%).
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 37, end_line: 52}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 154, end_line: 176}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 112, end_line: 114}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 124, end_line: 131}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 20, end_line: 20}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-006
+    type: rule
+    statement: >-
+      Retainage is withheld until the job is complete. Posting an invoice with RetgAmt > 0
+      automatically adds a RET hold. The RET hold can only be released (RetgRelAmt = RetgAmt) when the
+      job's JobStatus is 2 (complete) or 3 (closed). If the job is still open, release fails with
+      code 20. CTRL or CFO may release it.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 54, end_line: 60}
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 64, end_line: 77}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 88, end_line: 92}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 69, end_line: 69}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 175, end_line: 175}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-007
+    type: rule
+    statement: >-
+      A RET (retainage) hold does not block payment. It only withholds the retained portion. Every
+      other open hold blocks payment and keeps the invoice On Hold. The payable amount is GrossAmt
+      minus (RetgAmt - RetgRelAmt) minus PaidAmt.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 56, end_line: 67}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 99, end_line: 108}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 239, end_line: 245}
+      - {file: Scripts/Reports/412.sql, start_line: 23, end_line: 25}
+      - {file: Scripts/Reports/412.sql, start_line: 44, end_line: 46}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-008
+    type: rule
+    statement: >-
+      Duplicate detection: an invoice is a possible duplicate of another invoice when both have the
+      same company and vendor (VendGrp + Vendor), the same invoice number (trimmed, case-insensitive),
+      exactly the same gross amount, and invoice dates within N days of each other (N = APCoParm.DupDays,
+      default 90; the window was hardcoded to 60 before 2016). Voided invoices and the invoice itself
+      are excluded. Credit memos are never checked.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APDupCheck.sql, start_line: 24, end_line: 46}
+      - {file: Scripts/StoredProcedures/usp_APDupCheck.sql, start_line: 8, end_line: 8}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 18, end_line: 18}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 205, end_line: 209}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 87, end_line: 90}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-009
+    type: rule
+    statement: >-
+      Only an active CTRL or CFO user can override a duplicate. The entry screen warns, and non-CTRL/CFO
+      users cannot continue. The post proc blocks the invoice (code 14) unless @DupOvrdBy is given, and
+      rejects the override (code 15) if that user is not an active CTRL or CFO. The overriding user is
+      saved in APInvHdr.DupOvrdBy.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 91, end_line: 115}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 211, end_line: 213}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 170, end_line: 185}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-010
+    type: rule
+    statement: >-
+      Hold codes and who may release them: LW (lien waiver) by APCLK; INS (insurance) by RISK only,
+      with no override, not even by the CFO; DSP (dispute) by PM; MGR (management) by CTRL or by the
+      user who placed it; RET (retainage) by CTRL. CTRL and CFO may release any hold except INS.
+    locations:
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 160, end_line: 175}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 43, end_line: 62}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 218, end_line: 227}
+      - {file: ClientSide/AP/AP/frmAPPaymentHold.vb, start_line: 95, end_line: 103}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-011
+    type: rule
+    statement: >-
+      Only DSP and MGR holds can be placed by hand, and AP clerks cannot place MGR. A DSP hold needs a
+      note. Manual holds can only go on Approved or On Hold invoices, and placing one sets the status to
+      On Hold. LW, INS and RET are system-placed. These restrictions live only in the UI; the DB does
+      not stop other hold codes being inserted directly.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPPaymentHold.vb, start_line: 37, end_line: 41}
+      - {file: ClientSide/AP/AP/frmAPPaymentHold.vb, start_line: 66, end_line: 68}
+      - {file: ClientSide/AP/AP/frmAPPaymentHold.vb, start_line: 80, end_line: 93}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 244, end_line: 268}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-012
+    type: rule
+    statement: >-
+      Posting is blocked when the GL month is closed (GLMthStat.Status = 'C' for the invoice Mth,
+      return code 10). Separately, the entry screen blocks months on or before the AP subledger close
+      month (APCoParm.LastMthSubClsd). Mth is always stored as the first day of the month.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 54, end_line: 61}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 73, end_line: 78}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 28, end_line: 35}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 21, end_line: 21}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 90, end_line: 95}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-013
+    type: rule
+    statement: >-
+      A signed lien waiver is required before payment on job invoices with gross >= APCoParm.LienWvrThreshold
+      (default $5,000). If the waiver has not been received (LienWvrRcvd <> 'Y'), approval (including the
+      SYSTEM auto-approval) adds an LW hold and the invoice goes On Hold. Releasing the LW hold sets
+      LienWvrRcvd = 'Y'. The entry screen only warns, using a hardcoded $5,000.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 123, end_line: 130}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 141, end_line: 146}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 82, end_line: 86}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 247, end_line: 252}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 164, end_line: 168}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 19, end_line: 19}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-014
+    type: rule
+    statement: >-
+      Expired vendor insurance blocks payment. If the vendor's GL or WC certificate has expired
+      (ExpDate earlier than today) or has no expiry date, approval adds an INS hold. The INS hold cannot
+      be released while any GL or WC certificate is still expired (code 6). Other certificate types
+      (AUTO, UMB) are ignored.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 132, end_line: 139}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 70, end_line: 80}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 254, end_line: 260}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 61, end_line: 74}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 55, end_line: 62}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-015
+    type: rule
+    statement: >-
+      Rounding: money is rounded to the cent, with halves rounded away from zero (VB
+      MidpointRounding.AwayFromZero, to match SQL ROUND). This replaced VB's default banker's rounding,
+      which left pennies on the retainage payable (bug 2231). Retainage is rounded per line before the
+      lines are summed.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 143, end_line: 148}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 161, end_line: 167}
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 41, end_line: 43}
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 12, end_line: 12}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 97, end_line: 101}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-016
+    type: rule
+    statement: >-
+      Invoice header validation: the vendor must exist and be active (checked in the UI and the post
+      proc). The invoice number is required, trimmed, upper-cased and at most 15 characters. The invoice
+      date cannot be in the future unless APCoParm.AllowFutureInv = 'Y'. The gross amount cannot be zero.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 43, end_line: 90}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 63, end_line: 72}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.Designer.vb, start_line: 57, end_line: 58}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-017
+    type: rule
+    statement: >-
+      Line validation: an invoice needs at least one line. Job-cost lines need a Job and Phase, and the
+      job cannot be closed (JobStatus 3). Expense lines need a GL account. Equipment lines (type 3) are
+      rejected. The sum of line Amount + TaxAmt must equal the header gross (checked in the UI and again
+      in the post proc, code 13).
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 103, end_line: 138}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 80, end_line: 89}
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 36, end_line: 39}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-018
+    type: rule
+    statement: >-
+      [DB-ONLY] An invoice for a 1099-reportable vendor (V1099YN = 'Y') with no TIN on file cannot be posted
+      (return code 12, "Obtain W-9"). Only usp_APInvPost enforces this; the UI does no 1099 or TIN
+      validation, and a VB comment just defers to the proc.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 73, end_line: 78}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 16, end_line: 16}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 47, end_line: 48}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 82, end_line: 82}
+    evidence_class: Verified
+    flags: [db_only]
+
+  - id: BR-019
+    type: rule
+    statement: >-
+      [DEAD CODE] Early-payment discount of 2% if paid within 10 days of the invoice date ("2% 10 net 30").
+      The code is still there but nothing calls it: ApplyEarlyPayDiscount has no callers, and
+      clsAPInvoiceDAL.GetDiscTerms calls usp_APDiscTerms_OLD, which is not deployed and is not in the
+      corpus. The header comments say it was replaced by an APPayTerms table in 2011, and that table is
+      not in the corpus either. Do not carry it into the new system.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 283, end_line: 293}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 310, end_line: 324}
+    evidence_class: Inferred
+    flags: [dead_code]
+
+  - id: BR-020
+    type: rule
+    statement: >-
+      [UI vs DB INCONSISTENCY] The approval threshold boundary differs. The UI says invoices "at or above"
+      $10,000 need approval (RequiresApproval uses >=; the screen label reads ">= $10,000"). The post
+      proc routes to Pending Approval only when gross is strictly greater than ApprThreshold. So an
+      invoice of exactly $10,000.00 shows "Requires approval" on screen but the database auto-approves it.
+      Also, the UI uses a hardcoded constant while the DB reads APCoParm.ApprThreshold, so the two drift
+      apart if the parameter changes.
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 41, end_line: 44}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 181, end_line: 185}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.Designer.vb, start_line: 68, end_line: 72}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 97, end_line: 101}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 123, end_line: 129}
+    evidence_class: Confirmation Required
+    flags: [inconsistency]
+
+  - id: BR-021
+    type: rule
+    statement: >-
+      [COMMENT ONLY] Utility vendors (VendType 'U') are never subject to retainage, per a 2014 Controller
+      memo. No code enforces this in the UI or the DB. It relies on AP setting the vendor's DfltRetgPct to 0
+      by hand at vendor setup, so a utility vendor with a non-zero or null DfltRetgPct still has retainage
+      withheld.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 151, end_line: 153}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 46, end_line: 46}
+    evidence_class: Confirmation Required
+    flags: [comment_only]
+
+  - id: BR-022
+    type: rule
+    statement: >-
+      Due date = invoice date + the vendor's PayTerms days, or 30 days when the vendor has no terms (or
+      terms <= 0). It is recalculated when the vendor or invoice date changes.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 92, end_line: 98}
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 46, end_line: 46}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 79, end_line: 88}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-023
+    type: rule
+    statement: >-
+      Once an invoice is posted, its vendor, invoice number and gross amount cannot change (enforced by
+      the trigger). The entry screen also refuses to re-save a posted invoice ("Void and re-enter").
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 21, end_line: 35}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 150, end_line: 153}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-024
+    type: rule
+    statement: >-
+      Voiding needs a non-blank reason (checked in the trigger and the UI). Paid and Voided invoices
+      cannot be voided.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 69, end_line: 77}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 231, end_line: 249}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 287, end_line: 308}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-025
+    type: rule
+    statement: >-
+      Every status change writes an APInvAudit row with the old status, new status, DB login and timestamp.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 79, end_line: 86}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 195, end_line: 205}
+    evidence_class: Verified
+    flags: []
+
+  - id: BR-026
+    type: rule
+    statement: >-
+      Invoice dates more than 365 days old are meant to be "flagged, not blocked" (2009 audit request).
+      In practice the code only writes to Debug output, so users never see the warning.
+    locations:
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 68, end_line: 71}
+    evidence_class: Inferred
+    flags: []
+
+  - id: BR-027
+    type: rule
+    statement: >-
+      The PM approval queue shows only invoices on jobs where the user is the job's ProjMgr. This is just a
+      UI filter: the PM can tick "Show all", and usp_APInvApprove never checks the PM-to-job assignment. So a
+      PM can approve any invoice within their $25,000 limit. Whether PMs should be restricted to their own
+      jobs needs a decision.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 42, end_line: 53}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 72, end_line: 103}
+    evidence_class: Confirmation Required
+    flags: []
+
+  - id: BR-028
+    type: rule
+    statement: >-
+      [SECONDARY INCONSISTENCY, latent] The UI keeps hardcoded copies of DB-held parameters: the role
+      approval limits (vs APApprLim) and the lien-waiver $5,000 threshold on the entry screen (vs
+      APCoParm.LienWvrThreshold). The values match today but diverge if the tables change.
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 49, end_line: 63}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 92, end_line: 95}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 165, end_line: 165}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 19, end_line: 19}
+    evidence_class: Inferred
+    flags: [inconsistency]
+
+  - id: BR-029
+    type: rule
+    statement: >-
+      [SECONDARY DEAD CODE] Management (MGR) holds older than APCoParm.MgrHoldDays used to be released
+      automatically. This was removed after an audit finding; the MgrHoldDays column remains but nothing
+      uses it. Likewise, the "Approve All" bulk approval was removed in 2012.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 110, end_line: 111}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 23, end_line: 23}
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 127, end_line: 131}
+    evidence_class: Inferred
+    flags: [dead_code]
+
+  - id: BR-030
+    type: rule
+    statement: >-
+      Report 412 "Payable Now" is 0 when the invoice has a blocking hold or is not Approved; otherwise it is
+      OpenPayable. Report 412 lists only P, A and H invoices with invoice date <= the as-of date, ages them
+      by DueDate (Current, 1-30, 31-60, 61-90, Over 90) and flags retainage as eligible for release when
+      JobStatus >= 2.
+    locations:
+      - {file: Scripts/Reports/412.sql, start_line: 26, end_line: 33}
+      - {file: Scripts/Reports/412.sql, start_line: 48, end_line: 52}
+      - {file: "Reports/AP Accounts Payable/AP Open Payables by Job (412).txt", start_line: 30, end_line: 35}
+      - {file: "Reports/AP Accounts Payable/AP Open Payables by Job (412).txt", start_line: 47, end_line: 50}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # STATES (APInvHdr.Status)
+  # ===========================================================================
+
+  - id: ST-001
+    type: state
+    statement: "Open (O): entered but not posted. Also the state a rejected invoice returns to (PostedYN reset to 'N')."
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 15, end_line: 15}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 119, end_line: 119}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 63, end_line: 65}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-002
+    type: state
+    statement: "Pending Approval (P): posted, gross above the approval threshold, waiting for an approver."
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 16, end_line: 16}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 126, end_line: 127}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-003
+    type: state
+    statement: "Approved (A): approved by a user or SYSTEM with no blocking holds. Eligible for payment."
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 17, end_line: 17}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 100, end_line: 113}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-004
+    type: state
+    statement: "On Hold (H): approved, but at least one open non-RET hold (LW, INS, DSP, MGR) blocks payment."
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 18, end_line: 18}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 141, end_line: 146}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 247, end_line: 250}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-005
+    type: state
+    statement: >-
+      Paid (X, a legacy "cleared" code left over from check reconciliation): final. Nothing in this corpus
+      sets X; the payment process that would set it is missing (see EX-006).
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 19, end_line: 19}
+      - {file: Scripts/Tables/AP_Tables.sql, start_line: 132, end_line: 132}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-006
+    type: state
+    statement: "Voided (V): final. VoidReason, VoidBy and VoidDate are recorded."
+    locations:
+      - {file: ClientSide/AP/AP/modAPGlobals.vb, start_line: 20, end_line: 20}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 287, end_line: 308}
+    evidence_class: Verified
+    flags: []
+
+  - id: ST-100
+    type: state
+    statement: >-
+      Allowed status transitions: O->P, O->A, O->V; P->A, P->O, P->V; A->H, A->X, A->V; H->A, H->V. Paid (X)
+      and Voided (V) are final. H->X is not allowed: holds must be released first. A->X also needs no open
+      non-RET holds. The trigger enforces this and IsTransitionAllowed in the UI mirrors it.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 39, end_line: 54}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 265, end_line: 281}
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 56, end_line: 67}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # WORKFLOWS
+  # ===========================================================================
+
+  - id: WF-001
+    type: workflow
+    statement: >-
+      Invoice entry and posting:
+      (1) validate the header (vendor, invoice #, dates, AP closed month);
+      (2) validate the lines;
+      (3) warn if a lien waiver is missing;
+      (4) run the duplicate check, with a CTRL/CFO override;
+      (5) insert the header (status O) and the lines;
+      (6) usp_APInvPost re-checks the GL month, vendor, 1099 TIN, balance and duplicates, computes
+          retainage (adding a RET hold), then routes to P or A;
+      (7) on the A path, SYSTEM approval applies the LW and INS holds.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 141, end_line: 226}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 20, end_line: 144}
+    evidence_class: Verified
+    flags: []
+
+  - id: WF-002
+    type: workflow
+    statement: >-
+      Approval: the approver opens the P queue (PMs see only their own jobs by default). The UI pre-checks
+      segregation of duties and the role limit. usp_APInvApprove 'A' re-checks status, segregation of
+      duties and limit, sets the invoice to A, then applies the LW and INS holds (A->H, return 1). The
+      reject path (needs a reason) returns the invoice to O.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 79, end_line: 117}
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 21, end_line: 150}
+    evidence_class: Verified
+    flags: []
+
+  - id: WF-003
+    type: workflow
+    statement: >-
+      Payment hold maintenance: look up the invoice; add a manual DSP or MGR hold (A->H); release a hold
+      after the UI authority check, the proc authority check and hold-specific checks (INS: certificates
+      must be current; LW: sets the waiver flag; RET: job must be complete). When no blocking holds remain,
+      the status returns to A. "Can Pay" lists the reasons payment is blocked.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPPaymentHold.vb, start_line: 46, end_line: 128}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 16, end_line: 115}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 232, end_line: 263}
+    evidence_class: Verified
+    flags: []
+
+  - id: WF-004
+    type: workflow
+    statement: >-
+      Retainage lifecycle: the per-line retainage shown at entry is recomputed by the proc at post. A RET
+      hold is placed and the retained amount is excluded from OpenPayable. When the job reaches JobStatus
+      2 or 3, CTRL or CFO releases the RET hold, RetgRelAmt is set to RetgAmt, and report 412 shows the
+      retainage as payable.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 17, end_line: 83}
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 88, end_line: 92}
+      - {file: Scripts/Reports/412.sql, start_line: 23, end_line: 25}
+    evidence_class: Verified
+    flags: []
+
+  # ===========================================================================
+  # EXCEPTIONS / ERROR PATHS / GAPS
+  # ===========================================================================
+
+  - id: EX-001
+    type: exception
+    statement: >-
+      usp_APInvPost return codes: 1 not found or not Open/unposted; 10 GL month closed; 11 vendor inactive;
+      12 1099 vendor without TIN; 13 lines out of balance; 14 duplicate; 15 duplicate override not
+      authorized. Any non-zero code stops the post; the UI shows "Post failed (rc)".
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 7, end_line: 11}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 211, end_line: 217}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-002
+    type: exception
+    statement: >-
+      usp_APInvApprove return codes: 0 ok; 1 approved but held (informational, not an error); 2 bad
+      status or action; 3 not authorized (segregation of duties or no authority); 4 over limit; 5 reason
+      required. usp_APInvPost treats 1 as success on the auto-approve path.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 13, end_line: 14}
+      - {file: ClientSide/AP/AP/frmAPInvoiceApproval.vb, start_line: 90, end_line: 98}
+      - {file: Scripts/StoredProcedures/usp_APInvPost.sql, start_line: 139, end_line: 139}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-003
+    type: exception
+    statement: >-
+      usp_APHoldRelease return codes: 1 no open hold of that code; 3 user not authorized; 6 vendor insurance
+      still expired; 20 job not complete (passed through from usp_APRetgCompute).
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APHoldRelease.sql, start_line: 8, end_line: 9}
+      - {file: Scripts/StoredProcedures/usp_APRetgCompute.sql, start_line: 68, end_line: 72}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-004
+    type: exception
+    statement: >-
+      Trigger violations (invalid transition, paying with open holds, void without a reason, changing
+      frozen fields) raise a severity-11 error and roll back the whole transaction. In the DAL, SQL
+      exceptions from proc calls become return code 99, and direct SQL calls return False with LastError
+      set.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 90, end_line: 92}
+      - {file: ClientSide/AP/AP/clsAPInvoiceDAL.vb, start_line: 348, end_line: 352}
+    evidence_class: Verified
+    flags: []
+
+  - id: EX-005
+    type: exception
+    statement: >-
+      If a line insert fails after the header was inserted, the header is left orphaned (status O, unposted,
+      no or partial lines). A TODO says a nightly cleanup job removes these, but that job is not in the corpus.
+    locations:
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 200, end_line: 209}
+    evidence_class: Unknown
+    flags: []
+
+  - id: EX-006
+    type: exception
+    statement: >-
+      The payment process (check run or EFT) that moves A->X and updates PaidAmt is not in the corpus. So
+      it is unknown whether it calls the same eligibility checks as clsAPInvoiceBL.CanPay, or relies only
+      on the trigger's open-hold check. The trigger does not re-check the lien waiver or insurance; it only
+      checks for holds.
+    locations:
+      - {file: Scripts/Triggers/trg_APInvHdr_u.sql, start_line: 56, end_line: 67}
+      - {file: ClientSide/AP/AP/clsAPInvoiceBL.vb, start_line: 232, end_line: 263}
+    evidence_class: Unknown
+    flags: []
+
+  - id: EX-007
+    type: exception
+    statement: >-
+      A rejected invoice goes back to Open and unposted, but no screen in the corpus reloads an existing
+      invoice for editing or re-posting. The entry form only creates new invoices. How rejected invoices
+      are corrected (edit and repost, or void and re-enter) is unknown.
+    locations:
+      - {file: Scripts/StoredProcedures/usp_APInvApprove.sql, start_line: 63, end_line: 65}
+      - {file: ClientSide/AP/AP/frmAPInvoiceEntry.vb, start_line: 150, end_line: 153}
+    evidence_class: Unknown
+    flags: []

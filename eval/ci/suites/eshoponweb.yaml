@@ -1,0 +1,148 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Evaluation suite: public eShopOnWeb reference app (C# / ASP.NET Core / EF Core), MIT license.
+# The source is NOT in this repo. Fetch it at the commit the key is pinned to:
+#
+#   git clone https://github.com/dotnet-architecture/eShopOnWeb /tmp/eshop
+#   git -C /tmp/eshop checkout 4da8212
+#
+#   smoke (deterministic stages only, no Bedrock calls):
+#     python3 eval/ci/run_suite.py --config eval/ci/suites/eshoponweb.yaml --smoke \
+#       --out eval/ci/runs/eshop-smoke
+#
+#   full run against a pipeline output for /tmp/eshop:
+#     python3 eval/ci/run_suite.py --config eval/ci/suites/eshoponweb.yaml \
+#       --var run=output/eshoponweb --var key=<reviewed, filtered key> --out eval/ci/runs/eshop
+#
+# The key was built by eval/keygen (harvest + tests, no AI) and is a DRAFT until a human has
+# reviewed it: score against the filtered key that eval/keygen/review.py --filter-out writes
+# (accepted / edited items only) by passing --var key=... . Scoring against the draft measures
+# agreement with every harvested candidate, including the ones a reviewer would reject.
+#
+# The mutate stage injects 8 C# defects with seed 42 (eval/mutate, --lang auto -> cs); its
+# mutations.yaml is byte-identical to the committed eval/keys/eshoponweb/mutations-seed42.yaml
+# when ${corpus} is /tmp/eshop at 4da8212.
+
+suite: eshoponweb
+schema_version: 1
+description: >-
+  Spec recall and citation checks on the eShopOnWeb draft key (harvested from code and tests,
+  pending human review), plus the deterministic layers: C# syntax sanity, C# defect injection
+  and the mutation-detection floor of an existing pipeline output.
+
+# source_root is the analysed source; /tmp/eshop is only the default for a manual CLI run. The
+# launcher always passes the run's own copy (--var source_root=<run>/.source/<subdir> for a git
+# run, the path for a path run) and --var repo_root=<run>/.source. For a subdir run it also passes
+# a key whose locations were re-based onto the subdir (items outside the subdir left out).
+vars:
+  source_root: /tmp/eshop
+  repo_root: ${source_root}
+  corpus: ${source_root}
+  run: output/eshoponweb
+  key: eval/keys/eshoponweb/ANSWER_KEY.draft.yaml
+
+budget_usd: 3.0
+
+# score.py judge passes for every score stage. CI uses 1 so that the estimate, the cap and the
+# spend all describe one pass; use --judge-runs 3 for a number you intend to report.
+judge_runs: 1
+
+seeds:
+  mutate: 42
+
+corpora:
+  eshoponweb:
+    source_root: ${corpus}
+    key: ${key}
+    # the key lives outside the corpus; nothing in the corpus describes it
+    exclude: []
+
+stages:
+  # ---------------------------------------------------------------- deterministic layers
+  - id: corpus-sanity
+    evaluator: sanity
+    path: ${corpus}
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutate-eshop
+    evaluator: mutate
+    corpus_path: ${corpus}
+    mutations: 8
+    seed: 42
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutated-corpus-sanity
+    evaluator: sanity
+    path: ${stage:mutate-eshop}/corpus
+    smoke: true
+    est_usd: 0.0
+
+  # false-positive floor: how often the output for the UNMUTATED tree already flags the sites
+  # the injector touched (needs a pipeline run for /tmp/eshop)
+  - id: mutation-control-floor
+    evaluator: mutation_detect
+    mutations: ${stage:mutate-eshop}/mutations.yaml
+    output: ${run}/master_blend/master_blend.md
+    source_root: ${stage:mutate-eshop}/corpus
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  # ---------------------------------------------------------------- keyed spec scoring
+  - id: score-master-blend
+    evaluator: score
+    corpus: eshoponweb
+    spec: ${run}/master_blend/master_blend.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  - id: score-bottled
+    evaluator: score
+    corpus: eshoponweb
+    spec: ${run}/bottled_spec/bottled_spec.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+thresholds:
+  # exact, deterministic: enforce in smoke too
+  - stage: corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutated-corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutate-eshop
+    metric: applied
+    min: 8
+    applies_in_smoke: true
+  - stage: mutate-eshop
+    metric: sanity_problem_count
+    max: 0
+    applies_in_smoke: true
+  - stage: mutation-control-floor
+    metric: overall.detection_rate_pct
+    max: 20.0
+    applies_in_smoke: true
+  - stage: score-master-blend
+    metric: citations.validity_pct
+    min: 99.0
+    applies_in_smoke: true
+
+  # LLM-judged: full runs only. No recall floor yet: there is no reference run on this corpus,
+  # and the key is unreviewed. Set one from the first reviewed, 3-pass run.
+  - stage: score-master-blend
+    metric: precision.incorrect
+    max: 10

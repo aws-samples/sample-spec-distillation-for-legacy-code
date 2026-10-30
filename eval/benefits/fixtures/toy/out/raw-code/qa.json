@@ -1,0 +1,207 @@
+{
+  "benefit": "B2/B5 Q&A",
+  "script": "qa_eval",
+  "tool": "raw-code",
+  "adapter": "raw-code",
+  "qa": "eval/benefits/fixtures/toy/qa.yaml",
+  "source_root": "eval/benefits/fixtures/toy/src",
+  "context_truncated": false,
+  "summary": {
+    "questions": 3,
+    "questions_total": 3,
+    "correct_pct": 100.0,
+    "score_pct": 100.0,
+    "wrong": 0,
+    "engineer_correct_pct": 100.0,
+    "product_correct_pct": 100.0,
+    "trick_correct_pct": 100.0,
+    "trick_abstain_pct": 100.0,
+    "plain_language_avg": 4.0,
+    "answers_with_citations_pct": 100.0,
+    "citation_validity_pct": 100.0,
+    "citation_supported_pct": 100.0,
+    "citation_hits_reference_pct": 100.0,
+    "answer_tokens_in": 4571,
+    "answer_tokens_out": 582,
+    "answer_cost_usd": 0.0224,
+    "latency_avg_s": 3.32,
+    "errors": 0
+  },
+  "budget": {
+    "calls": 4,
+    "input_tokens": 6109,
+    "output_tokens": 842,
+    "cost_usd": 0.031,
+    "max_usd": 0.3,
+    "stopped": null
+  },
+  "questions": [
+    {
+      "id": "Q-E1",
+      "audience": "engineer",
+      "question": "What is the maximum number of lines an invoice submitted through SubmitInvoice can have, and what is returned when it is exceeded?",
+      "reference_answer": "25 lines (MAX_LINES = 25); more returns ERR_TOO_MANY_LINES. The comment saying 10 is stale.",
+      "reference_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 16,
+          "end_line": 16
+        }
+      ],
+      "answer": "An invoice submitted through SubmitInvoice can have a maximum of 25 lines. If that limit is exceeded, the function returns the string \"ERR_TOO_MANY_LINES\".",
+      "evidence_class": "code",
+      "cannot_determine": false,
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 16,
+          "end_line": 16,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "citation_overlaps_reference": true,
+      "tokens_in": 1529,
+      "tokens_out": 167,
+      "cost_usd": 0.007092,
+      "latency_s": 2.26,
+      "error": null,
+      "grade": {
+        "id": "Q-E1",
+        "correctness": "correct",
+        "citation_support": "supported",
+        "trick_handling": "n/a",
+        "plain_language": null,
+        "jargon": [],
+        "note": "Correctly states 25 lines max and ERR_TOO_MANY_LINES return value, supported by cited lines."
+      }
+    },
+    {
+      "id": "Q-P1",
+      "audience": "product",
+      "question": "Can any supplier have invoices approved automatically without a person reviewing them?",
+      "reference_answer": "Yes. Suppliers whose code starts with \"ZZ\" are approved automatically, but only for invoices up to 50,000; larger ones still go to approval.",
+      "reference_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 27
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21
+        }
+      ],
+      "answer": "Yes, but only under a specific condition. Suppliers whose supplier code starts with the letters 'ZZ' can have their invoices automatically set to 'Approved' by the system \u2014 with one important catch: if the invoice total exceeds $50,000, the database will override that approval and put the invoice back into 'Pending Approval' status, requiring a human review. So in practice, ZZ-prefix suppliers get automatic approval only when their invoice total is $50,000 or less. All other suppliers always go through the 'Pending Approval' route regardless of amount.",
+      "evidence_class": "code",
+      "cannot_determine": false,
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 25,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "citation_overlaps_reference": true,
+      "tokens_in": 1528,
+      "tokens_out": 245,
+      "cost_usd": 0.008259,
+      "latency_s": 5.2,
+      "error": null,
+      "grade": {
+        "id": "Q-P1",
+        "correctness": "correct",
+        "citation_support": "supported",
+        "trick_handling": "n/a",
+        "plain_language": 4,
+        "jargon": [
+          "ZZ-prefix",
+          "status",
+          "PENDING_APPROVAL",
+          "APPROVED"
+        ],
+        "note": "Accurately covers ZZ prefix auto-approval and $50k override; mostly plain but uses some status code terms."
+      }
+    },
+    {
+      "id": "Q-T1",
+      "audience": "trick",
+      "question": "What exact sales tax rate does the system apply to invoice totals?",
+      "reference_answer": "Cannot be determined as a single rate - the code is inconsistent. SubmitInvoice uses 8% (1.08) and RecalculateTotal uses 7% (1.07) with different rounding.",
+      "reference_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 20,
+          "end_line": 20
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 35,
+          "end_line": 35
+        }
+      ],
+      "answer": "The system applies an 8% sales tax rate (multiplier of 1.08) to invoice line totals when submitting an invoice. However, the RecalculateTotal function uses a 7% rate (multiplier of 1.07) instead. These two functions are inconsistent with each other.",
+      "evidence_class": "code",
+      "cannot_determine": true,
+      "citations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 20,
+          "end_line": 20,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 35,
+          "end_line": 35,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "citation_overlaps_reference": true,
+      "tokens_in": 1514,
+      "tokens_out": 170,
+      "cost_usd": 0.007092,
+      "latency_s": 2.51,
+      "error": null,
+      "grade": {
+        "id": "Q-T1",
+        "correctness": "correct",
+        "citation_support": "supported",
+        "trick_handling": "abstained_correctly",
+        "plain_language": null,
+        "jargon": [],
+        "note": "Correctly identifies inconsistency between 8% and 7% rates in two different functions, matching reference."
+      }
+    }
+  ]
+}
