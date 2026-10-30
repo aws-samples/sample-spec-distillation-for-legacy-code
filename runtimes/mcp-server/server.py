@@ -37,6 +37,56 @@ bedrock_runtime_client = bedrock_client.create_client(AWS_PROFILE, AWS_DEFAULT_R
 # Client for the pipeline stage calls (Converse / ConverseStream; see bedrock_client.call_llm)
 llm_client = bedrock_client.create_llm_client(AWS_PROFILE, AWS_DEFAULT_REGION)
 
+# ── Path confinement ─────────────────────────────────────────────────────────
+# Tool arguments come from an agent, which may be steered by prompt injection in the code it
+# reads. Every file or directory argument must resolve inside an allowed root, so a tool call
+# cannot read (and send to Bedrock) or write files elsewhere on the machine. Roots: this
+# repository, plus DISTILL_TARGET / DISTILL_OUTPUT when set, plus any directories listed in
+# DISTILL_MCP_ALLOWED_ROOTS (os.pathsep-separated).
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _allowed_roots() -> list[str]:
+    roots = [_REPO_ROOT]
+    for var in ("DISTILL_TARGET", "DISTILL_OUTPUT"):
+        if os.environ.get(var):
+            roots.append(os.environ[var])
+    roots += [r for r in os.environ.get("DISTILL_MCP_ALLOWED_ROOTS", "").split(os.pathsep) if r]
+    return [os.path.realpath(r) for r in roots]
+
+
+def _outside_roots(*paths) -> str:
+    """Return an error message for the first path outside the allowed roots, else ""."""
+    roots = _allowed_roots()
+    for p in paths:
+        for item in (p if isinstance(p, (list, tuple)) else [p]):
+            if not item:
+                continue
+            real = os.path.realpath(item)
+            if not any(os.path.commonpath([real, r]) == r for r in roots):
+                return (f"path outside allowed roots: {item}. Set DISTILL_MCP_ALLOWED_ROOTS "
+                        "to permit additional directories.")
+    return ""
+
+
+def _read_confined(path: str) -> str:
+    """Read a text file only if its fully resolved path lies inside an allowed root.
+
+    os.path.realpath resolves ".." segments and symlinks before the check, so neither can be
+    used to escape a root. Raises ValueError for any other path."""
+    real = os.path.realpath(path)
+    if not any(os.path.commonpath([real, root]) == root for root in _allowed_roots()):
+        raise ValueError(f"path outside allowed roots: {path}")
+    with open(real, "r", encoding="utf-8") as f:
+        return f.read()
+
+
+def _path_error(*paths):
+    err = _outside_roots(*paths)
+    return json.dumps({"error": True, "message": err}) if err else None
+
+
 # ── MCP Server ───────────────────────────────────────────────────────────────
 
 server = FastMCP("bedrock-distill")
@@ -50,7 +100,9 @@ server = FastMCP("bedrock-distill")
         "Submit a distillation job to process pages through a still extraction "
         "prompt via Amazon Bedrock. Returns immediately with a job_id for polling. "
         "Pass pages as either an inline list (pages param) or a file path containing "
-        "one page path per line (pages_file param). Use pages_file for large page sets."
+        "one page path per line (pages_file param). Use pages_file for large page sets. "
+        "Paths must be inside the allowed roots (this repository, DISTILL_TARGET, DISTILL_OUTPUT, "
+        "DISTILL_MCP_ALLOWED_ROOTS); others are refused."
     )
 )
 async def submit_distillation(
@@ -65,21 +117,25 @@ async def submit_distillation(
     model_id: str = "us.anthropic.claude-sonnet-4-6",
 ) -> str:
     """Submit a distillation job to process pages through a still extraction prompt."""
+    if err := _path_error(pages_file, output_dir):
+        return err
     # If pages_file provided, read page paths from it
     actual_pages = pages
     if pages_file and not actual_pages:
         try:
-            with open(pages_file, "r") as f:
-                actual_pages = [line.strip() for line in f if line.strip()]
+            actual_pages = [ln.strip() for ln in _read_confined(pages_file).splitlines() if ln.strip()]
         except Exception as e:
             return json.dumps({"error": True, "message": f"Failed to read pages_file: {e}"})
+    if err := _path_error(actual_pages):
+        return err
 
     # If still_prompt looks like a file path, auto-read it
     actual_prompt = still_prompt
     if actual_prompt and actual_prompt.startswith("/") and actual_prompt.endswith(".md"):
+        if err := _path_error(actual_prompt):
+            return err
         try:
-            with open(actual_prompt, "r") as f:
-                actual_prompt = f.read()
+            actual_prompt = _read_confined(actual_prompt)
         except Exception:
             pass  # Keep as-is if read fails
 
@@ -111,7 +167,9 @@ async def submit_distillation(
         "progress dashboard, and downstream are blind to which ran. Pass pages inline or via "
         "pages_file; stills=[] means all extraction stills. strategy omitted => registry "
         "effective-default. Returns job_id (page-centric) or job_ids per still (still-centric) "
-        "for polling via check_distillation."
+        "for polling via check_distillation. "
+        "Paths must be inside the allowed roots (this repository, DISTILL_TARGET, DISTILL_OUTPUT, "
+        "DISTILL_MCP_ALLOWED_ROOTS); others are refused."
     )
 )
 async def submit_map(
@@ -125,13 +183,16 @@ async def submit_map(
     concurrency: int = 50,
 ) -> str:
     """Submit a strategy-dispatched map job over pages × stills (stills by name)."""
+    if err := _path_error(pages_file, output_base):
+        return err
     actual_pages = pages
     if pages_file and not actual_pages:
         try:
-            with open(pages_file, "r") as f:
-                actual_pages = [line.strip() for line in f if line.strip()]
+            actual_pages = [ln.strip() for ln in _read_confined(pages_file).splitlines() if ln.strip()]
         except Exception as e:
             return json.dumps({"error": True, "message": f"Failed to read pages_file: {e}"})
+    if err := _path_error(actual_pages):
+        return err
 
     result = tools.handle_submit_map(
         {
@@ -168,6 +229,8 @@ async def submit_reduce(
     model_id: str = "us.anthropic.claude-sonnet-4-6",
 ) -> str:
     """Submit an async per-still reduce job (stills by name) → poll via check_distillation."""
+    if err := _path_error(partials_base, output_base):
+        return err
     result = tools.handle_submit_reduce(
         {
             "partials_base": partials_base,
@@ -227,7 +290,9 @@ async def cancel_distillation(job_id: str) -> str:
         "Reduce (merge) all page-level extraction partials into final still output. "
         "Reads all .md files from partials_dir, concatenates them with the reduce prompt, "
         "sends a single Bedrock call, and writes the merged result to output_dir. "
-        "Use after a map-phase job completes to produce the final still deliverables."
+        "Use after a map-phase job completes to produce the final still deliverables. "
+        "Paths must be inside the allowed roots (this repository, DISTILL_TARGET, DISTILL_OUTPUT, "
+        "DISTILL_MCP_ALLOWED_ROOTS); others are refused."
     )
 )
 async def reduce_distillation(
@@ -244,19 +309,22 @@ async def reduce_distillation(
     still_prompt_file: str = "",
 ) -> str:
     """Merge all extraction partials into final still output via a single Bedrock call."""
+    if err := _path_error(partials_dir, output_dir, still_prompt_file,
+                          output_file if os.path.isabs(output_file) else ""):
+        return err
     # If still_prompt_file provided, read the prompt from it
     actual_prompt = still_prompt
     if still_prompt_file and not actual_prompt:
         try:
-            with open(still_prompt_file, "r") as f:
-                actual_prompt = f.read()
+            actual_prompt = _read_confined(still_prompt_file)
         except Exception as e:
             return json.dumps({"error": True, "message": f"Failed to read still_prompt_file: {e}"})
     # If still_prompt looks like a file path, try to read it
     if actual_prompt and actual_prompt.startswith("/") and actual_prompt.endswith(".md"):
+        if err := _path_error(actual_prompt):
+            return err
         try:
-            with open(actual_prompt, "r") as f:
-                actual_prompt = f.read()
+            actual_prompt = _read_confined(actual_prompt)
         except Exception:
             pass  # Keep as-is if read fails
 
@@ -307,6 +375,8 @@ async def build_knowledge_graph(
     run_dir: str = "",
 ) -> str:
     """Build knowledge graph and materialize spec files from raw concat."""
+    if err := _path_error(concat_path, output_dir, manifest_path, graph_path, vector_db_path, run_dir):
+        return err
     import knowledge
 
     if run_dir:
@@ -363,6 +433,8 @@ async def query_spec(
     run_dir: str = "",
 ) -> str:
     """Ask a question about the distilled specification."""
+    if err := _path_error(vector_db_path, run_dir):
+        return err
     import query_spec as qs
 
     if not vector_db_path and run_dir:
@@ -403,6 +475,8 @@ async def vend_id(
     call_site: str = "",
 ) -> str:
     """Assign (or return the existing) unique ID for (category, claim_key)."""
+    if err := _path_error(ids_db_path):
+        return err
     import id_vending_machine as ivm
     try:
         vm = ivm.get_vending_machine(ids_db_path)
