@@ -553,7 +553,8 @@ class _Agg:
 def _llm(llm, model_id, system, user, max_tokens, phase, agg, label=""):
     """One model call with the system prompt marked for prompt caching (shared by every chunk
     call), retried on transient errors, logged ONCE to telemetry as still=bottling."""
-    blocks = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    # Converse API shape: a text block followed by a cachePoint (not Anthropic's cache_control).
+    blocks = [{"text": system}, {"cachePoint": {"type": "default"}}]
     for attempt in range(5):
         t0 = time.time()
         try:

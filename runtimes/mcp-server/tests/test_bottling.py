@@ -398,7 +398,8 @@ def test_exec_summary_input_is_small_and_system_prompt_cached(tmp_path, fake):
     assert len(readme_call["user"]) < 0.1 * len(blend)
     assert "y" * 200 not in readme_call["user"]                            # no block bodies
     for c in fake.calls:
-        assert c["system"][0]["cache_control"] == {"type": "ephemeral"}
+        assert c["system"][1] == {"cachePoint": {"type": "default"}}
+        assert set(c["system"][0]) == {"text"}                             # Converse shape only
     chunk_systems = {c["system"][0]["text"] for c in fake.calls if "REQUIREMENT BLOCKS:" in c["user"]}
     assert len(chunk_systems) == 1                                         # one shared, cacheable prefix
 
