@@ -1,0 +1,55 @@
+# macOS and editor metadata
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Local MCP client registrations (machine-specific; see demo/mcp.json.example)
+.mcp.json
+.kiro/
+
+# Credentials and machine-local environment
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Java and JavaScript build caches
+*.class
+node_modules/
+
+# Runtime and build output
+/build/
+/dist/
+/output/
+/outputs/
+*.log
+*.tmp
+
+# Generated archives
+/*.tar.gz
+/*.zip
+
+# .NET build output of the structural facts tool (setup.sh builds it locally)
+runtimes/facts/structure/bin/
+runtimes/facts/structure/obj/
+runtimes/facts/structure/out/
+eval/lean/structure/bin/
+eval/lean/structure/obj/
+eval/lean/structure/out/

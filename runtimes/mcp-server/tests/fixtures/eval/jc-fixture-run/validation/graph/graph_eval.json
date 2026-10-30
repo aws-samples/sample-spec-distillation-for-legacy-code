@@ -1,0 +1,206 @@
+{
+ "meta": {
+  "version": "1.0.0",
+  "output_dir": "output/jc-fixture-run",
+  "source_root": "synthetic-corpus/jc-changeorders",
+  "key": "eval/keys/jc-changeorders/ANSWER_KEY.yaml"
+ },
+ "provenance": {
+  "status": "ok",
+  "detail": "17/17 inventory entries verified by sha256",
+  "inventory_hash": "a35dfc742b83b87dc6c822e474991732624ffbadc830be4b59e1220f03ba7c37",
+  "manifest_inventory_hash": "a35dfc742b83b87dc6c822e474991732624ffbadc830be4b59e1220f03ba7c37",
+  "source_identity": "aac2584893b23fa66cfbae81e63e4e53766c88b445ae76c9d44a3ab8cce5c1eb",
+  "inventory_entries": 17,
+  "verified": 17,
+  "missing_from_source_root": [],
+  "digest_mismatch": [],
+  "untracked_in_source_root": []
+ },
+ "counts": {
+  "concept_nodes": 1611,
+  "concept_edges": 4243,
+  "code_source_files": 16,
+  "code_objects": 25,
+  "code_edges": 180,
+  "code_entities": 52,
+  "bridge_links": 957,
+  "source_files_on_disk": 17,
+  "parser_graph_nodes": 380,
+  "parser_graph_edges": 1702
+ },
+ "parity": {
+  "status": "ok",
+  "headline": {
+   "parser_confirmed_edge_precision_pct": 100.0,
+   "parser_edge_recall_pct": 100.0,
+   "pair_precision_pct": 100.0,
+   "pair_recall_pct": 100.0,
+   "f1_pct": 100.0
+  },
+  "core_relations": [
+   "table_read",
+   "table_write",
+   "proc_exec",
+   "trigger_on_table"
+  ],
+  "typed": {
+   "llm_edges": 52,
+   "parser_edges": 52,
+   "confirmed": 52,
+   "false_positives": 0,
+   "missing": 0,
+   "precision_pct": 100.0,
+   "recall_pct": 100.0,
+   "f1_pct": 100.0
+  },
+  "pair": {
+   "llm_edges": 43,
+   "parser_edges": 43,
+   "confirmed": 43,
+   "false_positives": 0,
+   "missing": 0,
+   "precision_pct": 100.0,
+   "recall_pct": 100.0,
+   "f1_pct": 100.0
+  },
+  "extended": {
+   "relations": [
+    "method_call"
+   ],
+   "llm_edges": 64,
+   "parser_edges": 63,
+   "confirmed": 63,
+   "false_positives": 1,
+   "missing": 0,
+   "precision_pct": 98.44,
+   "recall_pct": 100.0,
+   "f1_pct": 99.21,
+   "note": "scored separately so the headline stays comparable to the baseline, in which the LLM graph could not express these relations at all"
+  },
+  "by_provenance": {
+   "model_proposed": {
+    "core": {
+     "llm_edges": 52,
+     "parser_edges": 52,
+     "confirmed": 52,
+     "false_positives": 0,
+     "missing": 0,
+     "precision_pct": 100.0,
+     "recall_pct": 100.0,
+     "f1_pct": 100.0
+    },
+    "extended": {
+     "llm_edges": 61,
+     "parser_edges": 63,
+     "confirmed": 60,
+     "false_positives": 1,
+     "missing": 3,
+     "precision_pct": 98.36,
+     "recall_pct": 95.24,
+     "f1_pct": 96.77
+    }
+   },
+   "parser_backfilled_edges": 3,
+   "model_and_parser_agree_edges": 0,
+   "note": "`model_proposed` counts only code_edges the extraction prompt produced (code_edges.symbol does NOT start with 'facts:'); its recall is the honest measure of the prompt, since a parser-backfilled edge is scored against its own source."
+  },
+  "by_source_language": {
+   "sql": {
+    "llm_edges": 37,
+    "parser_edges": 37,
+    "confirmed": 37,
+    "false_positives": 0,
+    "missing": 0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "f1_pct": 100.0
+   },
+   "vbnet": {
+    "llm_edges": 15,
+    "parser_edges": 15,
+    "confirmed": 15,
+    "false_positives": 0,
+    "missing": 0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "f1_pct": 100.0
+   }
+  },
+  "by_source_language_model_proposed": {
+   "sql": {
+    "llm_edges": 37,
+    "parser_edges": 37,
+    "confirmed": 37,
+    "false_positives": 0,
+    "missing": 0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "f1_pct": 100.0
+   },
+   "vbnet": {
+    "llm_edges": 15,
+    "parser_edges": 15,
+    "confirmed": 15,
+    "false_positives": 0,
+    "missing": 0,
+    "precision_pct": 100.0,
+    "recall_pct": 100.0,
+    "f1_pct": 100.0
+   }
+  },
+  "false_positives": {
+   "total": 0,
+   "relation_mislabelled": 0,
+   "pair_not_in_parser": 0
+  }
+ },
+ "bridge_llm": {
+  "status": "skipped",
+  "reason": "--llm not given (deterministic run)"
+ },
+ "thresholds": {
+  "parser_confirmed_edge_precision_pct": 100.0,
+  "parser_confirmed_pair_precision_pct": 100.0,
+  "parser_edge_recall_pct": 100.0,
+  "parser_edge_recall_sql_pct": 100.0,
+  "parser_edge_recall_vbnet_pct": 100.0,
+  "parser_edge_recall_model_only_pct": 100.0,
+  "parser_edge_recall_vbnet_model_only_pct": 100.0,
+  "parser_method_call_recall_pct": 100.0,
+  "parser_method_call_precision_pct": 98.44,
+  "parser_edge_fp_not_in_parser": 0,
+  "bridge_symbol_occurrence_pct": 94.25,
+  "bridge_link_assertion_pct": 100.0,
+  "bridge_symbol_occurrence_bare_pct": 100.0,
+  "bridge_substring_only_links": 0,
+  "bridge_qualifier_dropped_links": 0,
+  "bridge_links_dropped_by_the_join": 2,
+  "bridge_name_absent_links": 0,
+  "bridge_concept_resolution_pct": 88.3,
+  "bridge_concept_exact_key_pct": 88.3,
+  "bridge_unresolved_concept_keys": 27,
+  "code_object_anchor_pct": 100.0,
+  "code_entity_anchor_pct": 100.0,
+  "code_edge_anchor_pct": 100.0,
+  "anchor_claims_contradicted": 0,
+  "source_file_resolve_pct": 100.0,
+  "concept_orphan_pct": 0.0,
+  "code_object_orphan_pct": 0.0,
+  "dangling_edges": 0,
+  "duplicate_node_ids": 0,
+  "self_loop_edges": 0,
+  "duplicate_edges": 0,
+  "same_as_contradictions": 0,
+  "contributes_to_cycles": 0,
+  "unified_id_mismatches": 0,
+  "key_item_coverage_any_pct": 100.0,
+  "key_item_coverage_full_pct": 35.29,
+  "key_items_missing": 0,
+  "key_location_recall_pct": 99.48,
+  "bridge_llm_agreement_pct": null,
+  "bridge_llm_agreement_ci95_low_pct": null,
+  "hard_structural_failures": 27
+ },
+ "gate_violations": []
+}

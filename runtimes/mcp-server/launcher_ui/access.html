@@ -1,0 +1,123 @@
+<!doctype html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!-- Shared-access-code challenge page for the hosted launcher (launcher_server.py _gate()).
+     Plain HTML + vanilla CSS/JS, no build step. The theme tokens, top bar, and compliance banner
+     are an intentional copy of launcher_ui/index.html so the gate feels like one product; keep
+     them in sync if the launcher theme changes. The entered code is sent only in the in-flight
+     POST /api/auth request and never stored. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spec Distillation launcher &mdash; access</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* ── Theme tokens (duplicated from launcher_ui/index.html) ─────────────────────────────── */
+  :root {
+    --bg:#f8f9fa; --surface:#fff; --ink:#1a202c; --ink-soft:#2d3748; --muted:#6b7280;
+    --line:#e2e8f0; --line-soft:#edf1f5; --bar:#232f3e; --bar-2:#37475a; --panel-dark:#1e293b;
+    --accent:#ff9900; --accent-hover:#e08800; --accent-ink:#1a202c;
+    --ok:#22c55e; --ok-ink:#176c2f; --warn:#f59e0b; --warn-ink:#a65e00; --err:#ef4444; --err-ink:#a11;
+    --info:#2563eb; --info-soft:#f0f4ff;
+    --radius:8px; --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: light; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    line-height:1.5; color:var(--ink); background:var(--bg); margin:0;
+  }
+
+  /* ── Top bar (verbatim palette from the launcher) ──────────────────────────────────────── */
+  .top-bar {
+    height:48px; background:var(--bar); color:#fff; display:flex; align-items:center;
+    padding:0 24px; font-size:15px; font-weight:500; box-shadow:0 2px 8px rgba(0,0,0,.15);
+  }
+  .top-bar .brand { color:var(--accent); font-weight:700; margin-right:8px; }
+  .top-bar .target { color:#a0aec0; font-weight:400; }
+  .compliance {
+    background:#fffbf0; border-bottom:1px solid var(--line); color:var(--warn-ink);
+    padding:7px 24px; font-size:12.5px; font-weight:500;
+  }
+
+  main { max-width:460px; margin:0 auto; padding:48px 24px; }
+  section {
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:24px 26px; box-shadow:var(--shadow);
+  }
+  h1 { font-size:1.25rem; font-weight:700; color:var(--ink); margin:0 0 6px; }
+  p.sub { color:var(--muted); font-size:.9rem; margin:0 0 18px; }
+
+  label { display:block; margin:12px 0 4px; font-weight:600; color:var(--ink-soft); font-size:.9rem; }
+  input[type=password] {
+    width:100%; padding:9px 11px; border:1px solid #cbd5e0; border-radius:6px;
+    font-size:.95rem; background:#fff; color:var(--ink);
+  }
+  input[type=password]:hover { border-color:#9aa7b8; }
+  input:focus-visible, button:focus-visible {
+    outline:2px solid var(--accent); outline-offset:2px;
+  }
+  button.accent {
+    margin-top:16px; width:100%; padding:10px 18px; border-radius:6px;
+    border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink);
+    cursor:pointer; font-size:.95rem; font-weight:600;
+  }
+  button.accent:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+  button.accent:disabled { opacity:.5; cursor:default; }
+  .err { color:var(--err-ink); font-size:.88rem; margin-top:12px; }
+</style>
+</head>
+<body>
+<header class="top-bar"><svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="none" style="height:20px;width:auto;margin-right:10px;vertical-align:middle" role="img" aria-label="AWS"><path fill="#ffffff" d="M4.51 7.687c0 .197.02.357.058.475.042.117.096.245.17.384a.233.233 0 01.037.123c0 .053-.032.107-.1.16l-.336.224a.255.255 0 01-.138.048c-.054 0-.107-.026-.16-.074a1.652 1.652 0 01-.192-.251 4.137 4.137 0 01-.165-.315c-.415.491-.936.737-1.564.737-.447 0-.804-.129-1.064-.385-.261-.256-.394-.598-.394-1.025 0-.454.16-.822.484-1.1.325-.278.756-.416 1.304-.416.18 0 .367.016.564.042.197.027.4.07.612.118v-.39c0-.406-.085-.689-.25-.854-.17-.166-.458-.246-.868-.246-.186 0-.377.022-.574.07a4.23 4.23 0 00-.575.181 1.525 1.525 0 01-.186.07.326.326 0 01-.085.016c-.075 0-.112-.054-.112-.166v-.262c0-.085.01-.15.037-.186a.399.399 0 01.15-.113c.185-.096.409-.176.67-.24.26-.07.537-.101.83-.101.633 0 1.096.144 1.394.432.293.288.442.726.442 1.314v1.73h.01zm-2.161.811c.175 0 .356-.032.548-.096.191-.064.362-.182.505-.342a.848.848 0 00.181-.341c.032-.129.054-.283.054-.465V7.03a4.43 4.43 0 00-.49-.09 3.996 3.996 0 00-.5-.033c-.357 0-.618.07-.793.214-.176.144-.26.347-.26.614 0 .25.063.437.196.566.128.133.314.197.559.197zm4.273.577c-.096 0-.16-.016-.202-.054-.043-.032-.08-.106-.112-.208l-1.25-4.127a.938.938 0 01-.049-.214c0-.085.043-.133.128-.133h.522c.1 0 .17.016.207.053.043.032.075.107.107.208l.894 3.535.83-3.535c.026-.106.058-.176.1-.208a.365.365 0 01.214-.053h.425c.102 0 .17.016.213.053.043.032.08.107.101.208l.841 3.578.92-3.578a.458.458 0 01.107-.208.346.346 0 01.208-.053h.495c.085 0 .133.043.133.133 0 .027-.006.054-.01.086a.76.76 0 01-.038.133l-1.283 4.127c-.032.107-.069.177-.111.209a.34.34 0 01-.203.053h-.457c-.101 0-.17-.016-.213-.053-.043-.038-.08-.107-.101-.214L8.213 5.37l-.82 3.439c-.026.107-.058.176-.1.213-.043.038-.118.054-.213.054h-.458zm6.838.144a3.51 3.51 0 01-.82-.096c-.266-.064-.473-.134-.612-.214-.085-.048-.143-.101-.165-.15a.378.378 0 01-.031-.149v-.272c0-.112.042-.166.122-.166a.3.3 0 01.096.016c.032.011.08.032.133.054.18.08.378.144.585.187.213.042.42.064.633.064.336 0 .596-.059.777-.176a.575.575 0 00.277-.508.52.52 0 00-.144-.373c-.095-.102-.276-.193-.537-.278l-.772-.24c-.388-.123-.676-.305-.851-.545a1.275 1.275 0 01-.266-.774c0-.224.048-.422.143-.593.096-.17.224-.32.384-.438.16-.122.34-.213.553-.277.213-.064.436-.091.67-.091.118 0 .24.005.357.021.122.016.234.038.346.06.106.026.208.052.303.085.096.032.17.064.224.096a.46.46 0 01.16.133.289.289 0 01.047.176v.251c0 .112-.042.171-.122.171a.552.552 0 01-.202-.064 2.427 2.427 0 00-1.022-.208c-.303 0-.543.048-.708.15-.165.1-.25.256-.25.475 0 .149.053.277.16.379.106.101.303.202.585.293l.756.24c.383.123.66.294.825.513.165.219.244.47.244.748 0 .23-.047.437-.138.619a1.436 1.436 0 01-.388.47c-.165.133-.362.23-.591.299-.24.075-.49.112-.761.112z"/><g fill="#F90" fill-rule="evenodd" clip-rule="evenodd"><path d="M14.465 11.813c-1.75 1.297-4.294 1.986-6.481 1.986-3.065 0-5.827-1.137-7.913-3.027-.165-.15-.016-.353.18-.235 2.257 1.313 5.04 2.109 7.92 2.109 1.941 0 4.075-.406 6.039-1.239.293-.133.543.192.255.406z"/><path d="M15.194 10.98c-.223-.287-1.479-.138-2.048-.069-.17.022-.197-.128-.043-.24 1-.705 2.645-.502 2.836-.267.192.24-.053 1.89-.99 2.68-.143.123-.281.06-.218-.1.213-.53.687-1.72.463-2.003z"/></g></svg><span class="brand">Spec Distillation</span><span class="target">&mdash; Launcher</span></header>
+<div class="compliance">Synthetic or approved non-production code only. Runs use this machine's AWS profile; never enter credentials here.</div>
+<main>
+<section aria-labelledby="accessTitle">
+  <h1 id="accessTitle">Access code required</h1>
+  <p class="sub">Enter the shared access code to reach the launcher.</p>
+  <form id="f" autocomplete="off">
+    <label for="code">Access code</label>
+    <input type="password" id="code" name="code" autocomplete="off" autofocus>
+    <button type="submit" class="accent" id="go">Continue</button>
+    <div class="err" id="err" role="alert" hidden></div>
+  </form>
+</section>
+</main>
+<script>
+  const form = document.getElementById("f");
+  const codeEl = document.getElementById("code");
+  const errEl = document.getElementById("err");
+  const btn = document.getElementById("go");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const code = codeEl.value;
+    errEl.hidden = true;
+    btn.disabled = true;
+    try {
+      const r = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code })
+      });
+      if (r.status === 200) {
+        location.replace("/");
+        return;
+      }
+      let msg = "Incorrect access code.";
+      try {
+        const data = await r.json();
+        if (data && data.error) msg = data.error;
+      } catch (_) { /* keep default */ }
+      errEl.textContent = msg;
+      errEl.hidden = false;
+      codeEl.value = "";
+      codeEl.focus();
+    } catch (_) {
+      errEl.textContent = "Could not reach the server. Try again.";
+      errEl.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>

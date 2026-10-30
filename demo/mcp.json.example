@@ -1,0 +1,15 @@
+{
+  "_comment": "Example MCP client registration. Copy the mcpServers block into your MCP client's configuration and replace /ABS/PATH/TO/repo with this repository's absolute path. spec-query is a read-only consumer of a finished run; only its ask_spec tool calls Amazon Bedrock (and costs money). bedrock-distill exposes Bedrock-spending pipeline tools; register it only when automating a run, never for an agent you are asking questions of.",
+  "mcpServers": {
+    "spec-query": {
+      "command": "/ABS/PATH/TO/repo/runtimes/mcp-server/.venv/bin/python",
+      "args": ["/ABS/PATH/TO/repo/runtimes/mcp-server/spec_server.py"],
+      "env": {
+        "AWS_PROFILE": "your-profile",
+        "AWS_DEFAULT_REGION": "us-east-1",
+        "BEDROCK_MODEL_ID": "us.anthropic.claude-sonnet-4-6",
+        "PYTHONUNBUFFERED": "1"
+      }
+    }
+  }
+}

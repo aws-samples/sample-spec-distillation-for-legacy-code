@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<!-- Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+     SPDX-License-Identifier: MIT-0 -->
+<!-- The viewer's Evaluation page. One template, two writers:
+       * generate-viewer-v3.py copies it to viewer/pages/evaluation.html at generation time,
+         replacing __EVAL_API_BASE__ with its --api-base ("" for a standalone serve_viewer.py);
+       * launcher_server.py serves it for /runs/<id>/files/viewer/pages/evaluation.html with the
+         base "/api/runs/<id>", so viewers generated before this page existed (and read-only
+         imported runs) get it too.
+     The scorecard is read at VIEW time from <base>/api/eval (and <base>/api/eval/status while an
+     evaluation is running), so a new evaluation shows up without regenerating the viewer.
+     Plain HTML + vanilla JS, no build step, no external assets. Theme tokens follow the viewer's
+     PAGE_CSS and launcher_ui/index.html. -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Evaluation</title>
+<style>
+:root{--ink:#1a202c;--ink-soft:#2d3748;--muted:#6b7280;--line:#e2e8f0;--bar:#1e293b;--accent:#ff9900;
+  --ok:#22c55e;--ok-ink:#176c2f;--warn-ink:#a65e00;--err-ink:#a11;--info:#2563eb;
+  --exact:#0f766e;--exact-soft:#effaf8;--est:#6d28d9;--est-soft:#f6f3ff}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.55;color:#1a1a2e;background:#fff;margin:0;padding:24px 32px 48px}
+h1{font-size:1.6rem;font-weight:700;color:var(--ink);margin:0 0 10px}
+h2{font-size:1.25rem;font-weight:600;color:#fff;background:var(--bar);margin:28px -32px 14px;padding:10px 32px;scroll-margin-top:16px}
+h3{font-size:1rem;font-weight:600;color:#4a5568;margin:16px 0 8px}
+p{margin:0 0 10px;color:var(--ink-soft)}
+table{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:6px 10px;text-align:left;vertical-align:top}
+th{background:#f7fafc;font-weight:600;color:var(--ink-soft)}
+tr:nth-child(even){background:#f8fafc}
+code{background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:.86em;font-family:"SF Mono",Menlo,monospace}
+.callout{border-radius:6px;padding:10px 14px;margin:10px 0;font-size:.9rem}
+.callout.warn{background:#fffbf0;border:1px solid #f6d58a;color:var(--warn-ink)}
+.callout.info{background:#f0f4ff;border:1px solid #c7d7fe;color:#1e3a8a}
+.legend{display:flex;flex-wrap:wrap;gap:10px;margin:8px 0 4px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:.8rem;font-weight:600}
+.chip.exact{background:var(--exact-soft);color:var(--exact);border:1px solid #99d6cc}
+.chip.est{background:var(--est-soft);color:var(--est);border:1px dashed #b9a2f0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:900px){.grid{grid-template-columns:1fr}}
+.panel{border-radius:8px;padding:12px 16px;border:1px solid var(--line)}
+.panel.exact{border-left:5px solid var(--exact);background:linear-gradient(90deg,var(--exact-soft),#fff 30%)}
+.panel.est{border-left:5px dashed var(--est);background:linear-gradient(90deg,var(--est-soft),#fff 30%)}
+.panel h3{margin-top:4px}
+.panel.exact h3{color:var(--exact)} .panel.est h3{color:var(--est)}
+.kv{display:grid;grid-template-columns:minmax(150px,42%) 1fr;gap:3px 12px;font-size:13.5px;margin:4px 0 10px}
+.kv .k{color:var(--muted)}
+.ci{color:var(--muted);font-size:.86em}
+.nm{color:var(--muted);font-style:italic}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:.74rem;font-weight:600;white-space:nowrap}
+.b-measured,.o-full{background:#e8f6ee;color:var(--ok-ink)}
+.b-partial,.o-partial{background:#fff4e0;color:var(--warn-ink)}
+.b-not_measured,.o-other{background:#eef0f3;color:#4b5563}
+.o-missed{background:#fdeaea;color:var(--err-ink)}
+.tag{font-size:.7rem;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-left:8px;vertical-align:middle}
+.tag.exact{background:var(--exact);color:#fff} .tag.est{background:var(--est);color:#fff}
+h2 .tag{background:rgba(255,255,255,.18)}
+.small{font-size:.8rem;color:var(--muted)}
+details summary{cursor:pointer;color:var(--ink-soft);font-weight:600;margin:6px 0}
+.running{background:#eaf1fb;border:1px solid #bcd3f5;color:#1d4ed8}
+a{color:var(--info)}
+</style>
+</head>
+<body>
+<h1 id="evaluation">Evaluation</h1>
+<div id="status"></div>
+<div id="root"><p class="small">Loading the evaluation…</p></div>
+<script>
+"use strict";
+// Replaced at generation / serve time; "" = same origin (standalone serve_viewer.py).
+const EVAL_API_BASE = "__EVAL_API_BASE__";
+const $ = (id) => document.getElementById(id);
+function esc(s){return String(s ?? "").replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const isNum = (v) => typeof v === "number" && isFinite(v);
+function n(v, pct){ if(!isNum(v)) return "–"; const s = Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : (Math.round(v*100)/100).toString(); return pct ? s + "%" : s; }
+function usd(v){ return isNum(v) ? "$" + v.toFixed(2) : "–"; }
+function nm(m){ return `<span class="nm">Not measured — ${esc((m && m.reason) || "no data")}</span>`; }
+function isPct(name){ return /_pct$|pct$/.test(String(name || "")); }
+
+// An exact value: the number, or "Not measured — reason". Never a silent 0.
+function ex(m, name, extra){
+  if(!m || m.status !== "measured" || !isNum(m.value)) return nm(m);
+  let s = n(m.value, isPct(name || m.metric));
+  if(isNum(m.confirmed) && isNum(m.llm_edges)) s += ` <span class="ci">(${m.confirmed}/${m.llm_edges} confirmed)</span>`;
+  return s + (extra || "");
+}
+// An estimated value: never a bare number. CI when recorded, else the measured noise band.
+function est(m, name){
+  if(!m || m.status !== "measured" || !isNum(m.value)) return nm(m);
+  const pct = isPct(name || m.metric);
+  let s = `<b>${n(m.value, pct)}</b>`;
+  if(m.ci95) s += ` <span class="ci">95% CI ${n(m.ci95[0], pct)}–${n(m.ci95[1], pct)}</span>`;
+  else if(isNum(m.noise_band)) s += ` <span class="ci">± ${n(m.noise_band)} measured judge noise (no CI recorded)</span>`;
+  else s += ` <span class="ci">(no CI recorded)</span>`;
+  if(m.across_runs && Array.isArray(m.across_runs.runs) && m.across_runs.runs.length > 1)
+    s += ` <span class="ci">· passes ${m.across_runs.runs.map((x)=>n(x, pct)).join(" / ")}</span>`;
+  return s;
+}
+function pill(status){ return `<span class="pill b-${esc(status)}">${esc(String(status).replace("_"," "))}</span>`; }
+function kv(rows){ return `<div class="kv">${rows.map(([k,v])=>`<div class="k">${esc(k)}</div><div>${v}</div>`).join("")}</div>`; }
+
+async function getJSON(path){
+  const r = await fetch(EVAL_API_BASE + path, {headers: {"Accept": "application/json"}});
+  let d = null; try { d = await r.json(); } catch(e) { d = null; }
+  return {status: r.status, data: d};
+}
+
+function exactPanel(E){
+  let h = `<div class="panel exact"><h3>Exact <span class="small">same answer every time, no AI</span></h3>`;
+  const c = E.conservation || {};
+  h += kv([["Lines conserved", c.status === "measured"
+      ? `${ex(c.lines, "lines")} lines in ${ex(c.files, "files")} files${c.ok ? " — every line paged exactly once" : " — <b>conservation check FAILED</b>"}`
+      : nm(c)]]);
+  if(!(E.spec_artifacts || []).length) h += kv([["Citations / structure", nm(E.spec_artifacts_status)]]);
+  for(const a of E.spec_artifacts || []){
+    h += `<div class="small"><b>${esc(a.label)}</b></div>` + kv([
+      ["Citation validity", ex(a.citation_validity_pct, "validity_pct") + (isNum((a.citations_valid||{}).value) && isNum((a.citations_total||{}).value) ? ` <span class="ci">(${a.citations_valid.value}/${a.citations_total.value})</span>` : "")],
+      ["Invalid citations", ex(a.citations_invalid)],
+      ["Findings without a citation", ex(a.findings_without_citation)],
+      ["Source lines cited", ex(a.source_line_coverage_pct, "pct")],
+      ["Duplicate ids / unresolved refs", `${ex(a.structural.duplicate_requirement_ids)} / ${ex(a.structural.unresolved_cross_references)}`],
+      ["Requirements without citation", ex(a.structural.requirements_without_citation)],
+    ]);
+  }
+  const g = E.graph || {};
+  h += `<div class="small"><b>Knowledge graph vs the parser</b></div>` + (g.status === "measured" ? kv([
+      ["Parser-confirmed precision", ex(g.parser_confirmed_edge_precision_pct, "pct")],
+      ["Parser edge recall", ex(g.parser_edge_recall_pct, "pct")],
+      ["Bridge link assertion holds", ex((g.bridge||{}).link_assertion_pct, "pct")],
+    ]) : kv([["Graph", nm(g)]]));
+  const cost = E.cost || {};
+  h += `<div class="small"><b>Cost of calls made</b></div>` + kv([
+    ["Pipeline", ex(cost.pipeline_usd) === nm(cost.pipeline_usd) ? nm(cost.pipeline_usd) : usd(cost.pipeline_usd.value) + (cost.pipeline_usd.calls ? ` <span class="ci">(${cost.pipeline_usd.calls} calls)</span>` : "")],
+    ["Evaluation", isNum(cost.evaluation_total_usd) ? usd(cost.evaluation_total_usd) + ` <span class="ci">(${(cost.evaluation||[]).length} recorded source(s))</span>` : `<span class="nm">Not measured — no evaluation spend recorded</span>`],
+  ]);
+  return h + `</div>`;
+}
+
+function estPanel(S){
+  let h = `<div class="panel est"><h3>Estimated <span class="small">LLM-as-a-judge (Claude on Bedrock), 95% CI</span></h3>`;
+  if(!(S.spec_artifacts || []).some((a)=>a.method === "llm")) h += kv([["Judged recall / precision", nm(S.spec_artifacts_status)]]);
+  for(const a of S.spec_artifacts || []){
+    const m = a.metrics || {};
+    const ag = a.agreement || {};
+    const g = a.golden || {};
+    const jr = isNum(a.judge_runs) ? String(a.judge_runs) : nm(a.judge_runs);
+    h += `<div class="small"><b>${esc(a.label)}</b> <span class="ci">${esc(a.segmentation || "")}${a.key_items ? " · " + a.key_items + " key items" : ""}</span></div>`;
+    h += kv([
+      ["Recall, any match", est(m.recall_any_match_pct)],
+      ["Recall, full match", est(m.recall_strict_full_pct)],
+      ["Recall, partial credit", est(m.recall_partial_credit_pct)],
+      ["Precision (keyed)", est(m.precision_keyed_pct)],
+      ["Judged incorrect", est(m.incorrect, "incorrect")],
+      ["Judge abstained (uncertain)", est(m.uncertain, "uncertain")],
+      ["Judge passes", jr],
+      ["Fleiss kappa (verdicts)", ag.status === "not_measured" ? nm(ag) : (ag.fleiss_kappa_verdicts && ag.fleiss_kappa_verdicts.status === "measured" ? `${n(ag.fleiss_kappa_verdicts.value)} <span class="ci">${esc(ag.fleiss_kappa_verdicts.label || "")}</span>` : nm(ag.fleiss_kappa_verdicts))],
+      ["Agreement with human labels", g.status === "measured" ? `${n(g.agreement_pct, true)} of ${g.n_labelled} labelled items <span class="ci">(Cohen κ ${n(g.cohen_kappa)}, ${esc(g.labelled_by || "")})</span>` : nm(g)],
+    ]);
+  }
+  return h + `</div>`;
+}
+
+function trapsSection(T){
+  let h = `<h2 id="planted-problems">Planted problems <span class="tag est">Estimated</span></h2>`;
+  if(!T || T.status !== "measured") return h + `<p>${nm(T)}</p>`;
+  const arts = T.artifacts || [];
+  h += `<p class="small">Key items carrying a trap flag in <code>${esc(T.key)}</code>. Outcome = the judge's majority verdict for each judged artifact. ${esc(T.links)}.</p>`;
+  h += `<table><thead><tr><th>Trap</th><th>Category</th>${arts.map((a)=>`<th>${esc(a.replace("_"," "))}</th>`).join("")}<th>Where (source lines)</th><th>Judge vs human</th></tr></thead><tbody>`;
+  for(const r of T.rows || []){
+    const locs = (r.locations || []).map((l)=> l.url ? `<a href="${esc(l.url)}" target="_blank" rel="noopener"><code>${esc(l.ref)}</code></a>` : `<code>${esc(l.ref)}</code>`).join("<br>");
+    const jvh = (r.judge_vs_human || []).map((d)=>`<div><b>${esc(d.artifact.replace("_"," "))}:</b> judge <span class="pill o-${esc(d.judge)}">${esc(d.judge)}</span>, human <span class="pill o-${esc(d.human)}">${esc(d.human)}</span><div class="small">${esc(d.basis || "")}</div></div>`).join("");
+    h += `<tr><td><b>${esc(r.id)}</b><div class="small">${esc(r.statement)}</div></td><td>${(r.categories||[]).map(esc).join(", ")}</td>` +
+      arts.map((a)=>{ const o = (r.outcomes||{})[a]; const cls = ["full","partial","missed"].includes(o) ? o : "other"; return `<td><span class="pill o-${cls}">${esc(o || "–")}</span></td>`; }).join("") +
+      `<td>${locs}</td><td>${jvh || '<span class="small">no human label disagrees</span>'}</td></tr>`;
+  }
+  h += `</tbody></table>`;
+  const by = T.by_category || {}, tot = T.totals || {};
+  for(const a of arts){
+    const cats = by[a] || {}, t = tot[a] || {};
+    h += `<div class="small"><b>${esc(a.replace("_"," "))}</b>: ${(T.rows||[]).length} planted problems, ${t.full ?? "–"} full / ${t.partial ?? "–"} partial / ${t.missed ?? "–"} missed. By category: ` + Object.entries(cats).map(([c,v])=>`${esc(c)} ${v.full}/${v.partial}/${v.missed}`).join(" · ") + ` <span class="ci">(${esc(T.by_category_note || "")})</span></div>`;
+  }
+  return h;
+}
+
+function graphSection(G, S){
+  let h = `<h2 id="knowledge-graph">Knowledge-graph accuracy <span class="tag exact">Exact</span></h2>`;
+  if(!G || G.status !== "measured") return h + `<p>${nm(G)}</p>`;
+  h += `<p class="small">Graph edges compared with a real parser (Roslyn VB.NET/C#, ScriptDom T-SQL): ground truth for the relations it models. Core relations: ${(G.core_relations||[]).map(esc).join(", ")}. Provenance check: ${esc((G.provenance_check||{}).status || "?")} ${esc((G.provenance_check||{}).detail || "")}.</p>`;
+  const row = (label, p, r, c) => `<tr><td>${label}</td><td>${p}</td><td>${r}</td><td class="small">${c || ""}</td></tr>`;
+  const counts = (b) => b && isNum(b.confirmed) ? `${b.confirmed} confirmed · ${b.llm_edges} graph edges · ${b.parser_edges} parser edges` : "";
+  h += `<table><thead><tr><th>Scope</th><th>Parser-confirmed precision</th><th>Recall vs parser</th><th>Counts</th></tr></thead><tbody>`;
+  h += row("<b>All core relations</b>", ex(G.parser_confirmed_edge_precision_pct, "pct"), ex(G.parser_edge_recall_pct, "pct"), counts(G.parser_confirmed_edge_precision_pct));
+  for(const k of ["vbnet","sql","csharp"]){
+    const b = (G.by_language||{})[k] || {};
+    h += b.status === "measured" ? row(esc(b.label), ex(b.precision_pct, "pct"), ex(b.recall_pct, "pct"), counts(b))
+                                 : `<tr><td>${esc(b.label || k)}</td><td colspan="3">${nm(b)}</td></tr>`;
+  }
+  h += row("Edges the prompt proposed (no parser backfill)", "–", ex(G.model_proposed_recall_pct, "pct"), "");
+  const mc = G.method_call || {};
+  h += row("Method calls (extended set)", ex(mc.precision_pct, "pct"), ex(mc.recall_pct, "pct"), counts(mc));
+  h += `</tbody></table>`;
+  const b = G.bridge || {};
+  h += `<h3>Concept ↔ code bridge</h3>` + kv([
+    ["Link's own assertion holds", ex(b.link_assertion_pct, "pct")],
+    ["Symbol occurs in cited file (verbatim / bare)", `${ex(b.symbol_occurrence_pct, "pct")} / ${ex(b.symbol_occurrence_bare_pct, "pct")}`],
+    ["Concept key resolves to a graph node", ex(b.concept_resolution_pct, "pct")],
+    ["Bridge links", isNum(b.links) ? String(b.links) : nm({reason: "not reported"})],
+    ["Semantic sample (LLM)", (S.bridge_llm && S.bridge_llm.status === "measured") ? `<span class="tag est">Estimated</span> ${n(S.bridge_llm.agreement_pct, true)} correct (CI low ${n(S.bridge_llm.ci95_low_pct, true)})` : nm(S.bridge_llm)],
+  ]);
+  const st = G.structural || {};
+  h += `<h3>Structural integrity</h3>` + kv(Object.entries(st).map(([k, v])=>[k.replace(/_/g," "), ex(v)]));
+  const cc = G.concept_coverage || {};
+  h += kv([["Key items with a concept at ≥1 / all locations", `${ex(cc.key_item_coverage_any_pct, "pct")} / ${ex(cc.key_item_coverage_full_pct, "pct")}`]]);
+  return h;
+}
+
+function benefitsSection(B){
+  let h = `<h2 id="benefits">Benefit evaluations <span class="tag est">Estimated</span></h2>`;
+  h += `<p class="small">LLM-graded on small item sets, so the spread is wider than spec recall. A partial result is quoted with its graded count; a not-measured one is never quoted.</p>`;
+  h += `<table><thead><tr><th>Benefit</th><th>Status</th><th>Graded</th><th>Headline</th><th>Cost</th></tr></thead><tbody>`;
+  for(const b of Object.values(B || {})){
+    const metrics = Object.entries(b.metrics || {}).map(([k, m])=>`<div>${esc(k.replace(/_/g," "))}: ${m.status === "measured" ? `<b>${n(m.value, isPct(k))}</b>` : nm(m)}</div>`).join("");
+    const graded = isNum(b.graded) ? `${b.graded} of ${b.total} ${esc(b.what || "")}` : "–";
+    h += `<tr><td>${esc(b.label)}</td><td>${pill(b.status)}${b.reason ? `<div class="small">${esc(b.reason)}</div>` : ""}</td><td>${graded}</td><td>${metrics || '<span class="nm">—</span>'}</td><td>${usd(b.cost_usd)}</td></tr>`;
+  }
+  return h + `</tbody></table>`;
+}
+
+function suitesSection(D){
+  let h = `<h2 id="evaluation-runs">Evaluation runs</h2>`;
+  if(!(D.suites||[]).length) return h + `<p class="small">No eval/ci suite has been run for this run yet. Start one from the launcher (run detail → Evaluation): a free Smoke check, or a planned, budget-capped judged run.</p>`;
+  h += `<table><thead><tr><th>When</th><th>Mode</th><th>Verdict</th><th>Spend / cap</th><th>Judge passes</th><th>Stages</th></tr></thead><tbody>`;
+  for(const s of D.suites){
+    const st = (s.stages||[]).map((x)=>`${esc(x.id)}: ${esc(x.status)}`).join(", ");
+    h += `<tr><td>${esc((s.started_at||"").replace("T"," ").slice(0,19))}</td><td>${esc(s.mode)}</td><td>${esc(s.verdict || "")}</td><td>${s.mode === "plan" ? "planned " + usd(s.planned_usd) : usd(s.spent_usd) + " / " + usd(s.cap_usd)}</td><td>${esc(s.judge_runs ?? "–")}</td><td class="small">${st}</td></tr>`;
+  }
+  return h + `</tbody></table>`;
+}
+
+function provenanceSection(D){
+  const r = (D.provenance||{}).run || {};
+  let h = `<h2 id="provenance">Provenance</h2>`;
+  h += kv([["Run directory", `<code>${esc(r.dir)}</code>`], ["Pipeline model / region", `${esc(r.model_id || "–")} / ${esc(r.region || "–")}`],
+           ["Source commit", r.commit ? `<code>${esc(r.commit.slice(0,12))}</code>` : '<span class="nm">not recorded (local-path run)</span>'],
+           ["Source inventory hash", r.source_inventory_hash ? `<code>${esc(r.source_inventory_hash.slice(0,16))}</code>` : "–"]]);
+  h += `<table><thead><tr><th>Evaluation</th><th>Commit</th><th>Model / region</th><th>Judge passes</th><th>Corpus hash</th><th>When</th></tr></thead><tbody>`;
+  for(const e of (D.provenance||{}).evaluations || []){
+    const corp = e.corpora ? Object.values(e.corpora).map((c)=>(c.content_sha256||"").slice(0,12)).join(", ") : (e.corpus_hash || "").slice(0,12);
+    h += `<tr><td>${esc(e.kind)}${e.artifact ? " · " + esc(e.artifact) : ""}${e.mode ? " · " + esc(e.mode) : ""}<div class="small"><code>${esc(e.source)}</code></div></td><td>${e.commit ? `<code>${esc(e.commit.slice(0,12))}</code>${e.dirty ? " (dirty)" : ""}` : "–"}</td><td>${esc(e.model || e.model_id || "–")}${e.region ? " / " + esc(e.region) : ""}</td><td>${isNum(e.judge_runs) ? e.judge_runs : (e.judge_runs && e.judge_runs.status ? '<span class="nm">not recorded</span>' : esc(e.judge_runs ?? "–"))}</td><td>${corp ? `<code>${esc(corp)}</code>` : "–"}</td><td class="small">${esc((e.when||"").replace("T"," ").slice(0,19))}${e.when_basis ? " (" + esc(e.when_basis) + ")" : ""}</td></tr>`;
+  }
+  h += `</tbody></table>`;
+  const sk = D.skipped_sources || [];
+  if(sk.length) h += `<details><summary>${sk.length} artifact(s) found but not used</summary><ul class="small">${sk.map((s)=>`<li><code>${esc(s.source)}</code>: ${esc(s.reason)}</li>`).join("")}</ul></details>`;
+  return h;
+}
+
+function publishToc(){
+  const hs = Array.from(document.querySelectorAll("h2[id]"));
+  try { window.parent.postMessage({type: "toc-update", toc: hs.map((h)=>({id: h.id, title: h.textContent.trim(), level: 2}))}, "*"); } catch(e) {}
+}
+window.addEventListener("message", (e) => {
+  if(e.data && e.data.type === "scrollTo"){ const el = document.getElementById(e.data.id); if(el) el.scrollIntoView({behavior: "smooth", block: "start"}); }
+});
+
+function render(D){
+  let h = `<div class="callout warn">${esc(D.banner)}</div>`;
+  h += `<div class="legend"><span class="chip exact">■ ${esc(D.legend.exact)}</span><span class="chip est">▨ ${esc(D.legend.estimated)}</span></div>`;
+  if(D.provisional) h += `<div class="callout warn">${esc(D.provisional)}</div>`;
+  if(D.key_note) h += `<div class="callout info small">${esc(D.key_note)}</div>`;
+  if(!D.has_answer_key) h +=`<div class="callout info">No answer key has been scored for this run, so only the Exact checks below apply.</div>`;
+  h += `<h2 id="scorecard">Scorecard</h2><div class="grid">${exactPanel(D.exact)}${estPanel(D.estimated)}</div>`;
+  h += `<p class="small">${esc(D.estimated.how_to_read)}</p>`;
+  h += trapsSection(D.estimated.traps);
+  h += graphSection(D.exact.graph, D.estimated);
+  h += benefitsSection(D.estimated.benefits);
+  h += suitesSection(D);
+  h += provenanceSection(D);
+  $("root").innerHTML = h;
+  publishToc();
+}
+
+let lastState = null, timer = null;
+async function pollStatus(){
+  let s;
+  try { s = await getJSON("/api/eval/status"); } catch(e) { return; }
+  if(s.status !== 200 || !s.data) { $("status").innerHTML = ""; return; }
+  const d = s.data;
+  const active = ["planning", "running"].includes(d.state);
+  $("status").innerHTML = active
+    ? `<div class="callout running">An evaluation is ${esc(d.state)} (${esc(d.mode)}): spent ${usd(d.spent_usd)}${isNum(d.budget_usd) ? " of " + usd(d.budget_usd) + " cap" : ""}. This page refreshes when it finishes.</div>`
+    : "";
+  if(lastState && ["planning","running"].includes(lastState) && !active) load();
+  lastState = d.state;
+  clearTimeout(timer);
+  timer = setTimeout(pollStatus, active ? 4000 : 15000);
+}
+
+async function load(){
+  try {
+    const {status, data} = await getJSON("/api/eval");
+    if(status !== 200 || !data){
+      $("root").innerHTML = `<div class="callout warn">The evaluation API is not available here (HTTP ${status}). Open this viewer through the launcher (Open viewer), or serve it with serve_viewer.py.</div>`;
+      return;
+    }
+    render(data);
+  } catch(e) {
+    $("root").innerHTML = `<div class="callout warn">Could not load the evaluation: ${esc(e.message || e)}</div>`;
+  }
+}
+load();
+pollStatus();
+</script>
+</body>
+</html>

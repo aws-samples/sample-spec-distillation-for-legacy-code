@@ -1,0 +1,4 @@
+lifecycle_registry.md
+transition_specs.md
+cross_entity_dependencies.md
+README.md

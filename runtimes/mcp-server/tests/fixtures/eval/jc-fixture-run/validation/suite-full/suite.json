@@ -1,0 +1,479 @@
+{
+ "suite_schema_version": 1,
+ "provenance": {
+  "suite": "jc-changeorders",
+  "suite_config": {
+   "path": "eval/ci/suites/jc-changeorders.yaml",
+   "sha256": "e650d2918434338db460278cd58ae2b931f85d1ad6bf2e3f32b7e7dc50a17d54",
+   "schema_version": 1
+  },
+  "git": {
+   "commit": "0000000000000000000000000000000000000000",
+   "branch": "main",
+   "dirty": true
+  },
+  "model_id": "us.anthropic.claude-sonnet-4-6",
+  "region": "us-east-1",
+  "region_source": "eval/bedrock_util.py REGION",
+  "shell_default_region": "us-west-2",
+  "judge_runs_default": 1,
+  "corpora": {
+   "jc-changeorders": {
+    "source_root": "synthetic-corpus/jc-changeorders",
+    "exists": true,
+    "content": {
+     "sha256": "dbbf42a2d9764ce9dfad30f17e2592dcad62d254edf3a255c0b2f8727a6d2dec",
+     "n_files": 17
+    },
+    "excluded_from_hash": [
+     "README.md"
+    ],
+    "key": "eval/keys/jc-changeorders/ANSWER_KEY.yaml",
+    "key_exists": true,
+    "key_sha256": "644081ba34ce676ea3cb8be5cacc7ae5688b580a1c57743761bbe27e4a858c73"
+   }
+  },
+  "seeds": {
+   "mutate": 7
+  },
+  "vars": {
+   "corpus": "synthetic-corpus/jc-changeorders",
+   "keys": "eval/keys/jc-changeorders",
+   "run": "output/jc-fixture-run",
+   "insights_spec": "output/jc-changeorders-v2/issues/issues.md"
+  },
+  "python": "3.12.0",
+  "platform": "macOS-26.7.1-arm64-arm-64bit",
+  "smoke": false,
+  "suite_schema_version": 1,
+  "plan": false
+ },
+ "started_at": "2026-10-07T03:27:11.025614+00:00",
+ "finished_at": "2026-10-07T04:15:00.894867+00:00",
+ "duration_s": 2869.87,
+ "out_dir": "output/jc-fixture-run/validation/suite-full",
+ "budget": {
+  "cap_usd": 15.0,
+  "spent_usd": 14.968899,
+  "calls": 165,
+  "remaining_usd": 0.031101,
+  "aborted": "budget exhausted at stage 'benefits-fieldapp': estimated $0.3140 would take spend to $15.2829 over the $15.00 cap"
+ },
+ "stages": [
+  {
+   "id": "corpus-sanity",
+   "evaluator": "sanity",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 0.0,
+    "stage_calls": 0,
+    "cumulative_usd": 0.0,
+    "cumulative_calls": 0
+   },
+   "started_at": "2026-10-07T03:27:11.066091+00:00",
+   "duration_s": 0.18,
+   "evaluator_sha256": "e668d0458d4139d3691fe12898dea3f2f91ac8bec054d7811c926b60103e230b",
+   "evaluator_help_sha256": "7899279f7e2b9205",
+   "estimated_usd": 0.0,
+   "returncode": 0,
+   "result_file": "corpus-sanity/sanity.json",
+   "result_sha256": "b1c2908c7ac932e7e54763577860526285bfc46fc6599827342c6e24c94062ef"
+  },
+  {
+   "id": "mutate-jc",
+   "evaluator": "mutate",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 0.0,
+    "stage_calls": 0,
+    "cumulative_usd": 0.0,
+    "cumulative_calls": 0
+   },
+   "started_at": "2026-10-07T03:27:11.330951+00:00",
+   "duration_s": 0.83,
+   "evaluator_sha256": "c8b40c25e3a541d42cd42bcd826bb29ffe79e405b6ba870d1abbbb6267c71998",
+   "evaluator_help_sha256": "120d0ea905535730",
+   "estimated_usd": 0.0,
+   "returncode": 0,
+   "result_file": "mutate-jc/mutate_manifest.json",
+   "result_sha256": "f364c5b2e01e0da3017cfadc8aba9aa6a68a8da2d1c70fff93e2b2641ab27234"
+  },
+  {
+   "id": "mutated-corpus-sanity",
+   "evaluator": "sanity",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 0.0,
+    "stage_calls": 0,
+    "cumulative_usd": 0.0,
+    "cumulative_calls": 0
+   },
+   "started_at": "2026-10-07T03:27:12.161049+00:00",
+   "duration_s": 0.18,
+   "evaluator_sha256": "e668d0458d4139d3691fe12898dea3f2f91ac8bec054d7811c926b60103e230b",
+   "evaluator_help_sha256": "7899279f7e2b9205",
+   "estimated_usd": 0.0,
+   "returncode": 0,
+   "result_file": "mutated-corpus-sanity/sanity.json",
+   "result_sha256": "77e52ce7b658ec5810c403555aed2dbd7f8adec8c21232272cc19c607dcc4e42"
+  },
+  {
+   "id": "mutation-control-floor",
+   "evaluator": "mutation_detect",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 0.0,
+    "stage_calls": 0,
+    "cumulative_usd": 0.0,
+    "cumulative_calls": 0
+   },
+   "started_at": "2026-10-07T03:27:12.430230+00:00",
+   "duration_s": 0.42,
+   "evaluator_sha256": "5d47a07f8dc5fc81c09a13b41b8e69d3c4d70d31c087e5d27f0bcf136f7218ad",
+   "evaluator_help_sha256": "b0b720fed51678ac",
+   "estimated_usd": 0.0,
+   "returncode": 0,
+   "result_file": "mutation-control-floor/mutation_score.json",
+   "result_sha256": "3bb75e9aa5d759099ef3ebf8141f38776ae84f898a17e2ae1a14587396d5c3e1"
+  },
+  {
+   "id": "graph-eval",
+   "evaluator": "graph_eval",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 0.0,
+    "stage_calls": 0,
+    "cumulative_usd": 0.0,
+    "cumulative_calls": 0
+   },
+   "started_at": "2026-10-07T03:27:12.954288+00:00",
+   "duration_s": 0.45,
+   "evaluator_sha256": "ad4c320f093bca923d00c6e215229ea749bfec26e49277db8a501503e1cd35f3",
+   "evaluator_help_sha256": "7339a069c5eccd51",
+   "estimated_usd": 0.0,
+   "returncode": 0,
+   "result_file": "graph-eval/graph_eval.json",
+   "result_sha256": "098b953dd0b6903cd6f357dd524f968d7642a2809b2fa7dc5c1c6a946e4f4c31"
+  },
+  {
+   "id": "score-master-blend",
+   "evaluator": "score",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 5.818791,
+    "stage_calls": 55,
+    "cumulative_usd": 5.818791,
+    "cumulative_calls": 55
+   },
+   "started_at": "2026-10-07T03:27:14.445592+00:00",
+   "duration_s": 1031.8,
+   "judge_runs": 1,
+   "evaluator_sha256": "67acbd6beac3e94fb23550ce42a2e90ef8aee5fd5113347b68a861ab83d9fa14",
+   "evaluator_help_sha256": "9dcf4ea1d4a6b55f",
+   "estimate": {
+    "usd": 5.5154,
+    "source": "evaluator_plan",
+    "detail": "eval/score.py --dry-run-judge -> judge_plan.est_cost_usd",
+    "plan": {
+     "calls": 55,
+     "runs": 1,
+     "findings": 1353,
+     "batches": 55,
+     "expected_cache_hits": 0,
+     "expected_bedrock_calls": 55,
+     "est_cost_usd_uncached": 5.5154
+    }
+   },
+   "estimated_usd": 5.5154,
+   "cap_passed_usd": 15.0,
+   "returncode": 0,
+   "result_file": "score-master-blend/score.json",
+   "result_sha256": "5a93fc485ea5b70e594fa81a9bf9127460709a9d84d4f3eddff892a5640f1efa"
+  },
+  {
+   "id": "score-bottled",
+   "evaluator": "score",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 5.446596,
+    "stage_calls": 62,
+    "cumulative_usd": 11.265387,
+    "cumulative_calls": 117
+   },
+   "started_at": "2026-10-07T03:44:26.882946+00:00",
+   "duration_s": 1041.03,
+   "judge_runs": 1,
+   "evaluator_sha256": "67acbd6beac3e94fb23550ce42a2e90ef8aee5fd5113347b68a861ab83d9fa14",
+   "evaluator_help_sha256": "9dcf4ea1d4a6b55f",
+   "estimate": {
+    "usd": 5.07,
+    "source": "evaluator_plan",
+    "detail": "eval/score.py --dry-run-judge -> judge_plan.est_cost_usd",
+    "plan": {
+     "calls": 60,
+     "runs": 1,
+     "findings": 1496,
+     "batches": 60,
+     "expected_cache_hits": 0,
+     "expected_bedrock_calls": 60,
+     "est_cost_usd_uncached": 5.07
+    }
+   },
+   "estimated_usd": 5.07,
+   "cap_passed_usd": 9.1812,
+   "returncode": 0,
+   "result_file": "score-bottled/score.json",
+   "result_sha256": "457c95e7533d3ede94915410a3db7ac0a6e70d6e0f84ff454e1a13771f346504"
+  },
+  {
+   "id": "benefits-insights",
+   "evaluator": "benefits_insights",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 1.00455,
+    "stage_calls": 8,
+    "cumulative_usd": 12.269937,
+    "cumulative_calls": 125
+   },
+   "started_at": "2026-10-07T04:01:48.266668+00:00",
+   "duration_s": 102.66,
+   "judge_runs": 1,
+   "evaluator_sha256": "6a9ec66b8204044237339d905d617df67124e7adef8e2c15d26072cf7032a419",
+   "evaluator_help_sha256": "25d81371b6d84959",
+   "estimate": {
+    "usd": 0.9762,
+    "source": "evaluator_plan",
+    "detail": "eval/benefits/insights.py --dry-run -> plan.est_cost_usd",
+    "plan": {
+     "calls": 4,
+     "findings": 164
+    }
+   },
+   "estimated_usd": 0.9762,
+   "cap_passed_usd": 3.7346,
+   "returncode": 0,
+   "result_file": "benefits-insights/insights.json",
+   "result_sha256": "ad5a819e6f049d7c3645855b43b1091cd52be649baf7bfbb64b05209ca89246f",
+   "measurement": {
+    "status": "measured",
+    "reason": null
+   }
+  },
+  {
+   "id": "benefits-qa",
+   "evaluator": "benefits_qa",
+   "status": "ok",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 1.631238,
+    "stage_calls": 30,
+    "cumulative_usd": 13.901175,
+    "cumulative_calls": 155
+   },
+   "started_at": "2026-10-07T04:03:31.239819+00:00",
+   "duration_s": 223.95,
+   "evaluator_sha256": "1c13e0a0e4c37f17c2409378c47d0fda03e668fc5060943db21e41811d15c5ec",
+   "evaluator_help_sha256": "47c5e3a882b83325",
+   "estimate": {
+    "usd": 1.7821,
+    "source": "evaluator_plan",
+    "detail": "eval/benefits/qa_eval.py --dry-run -> plan.est_cost_usd",
+    "plan": {
+     "calls": 30,
+     "questions": 25,
+     "context": {
+      "mode": "retrieval",
+      "method": "bm25",
+      "spec_chars": 514171,
+      "budget_chars": 60000,
+      "chunks_total": 627
+     }
+    }
+   },
+   "estimated_usd": 1.7821,
+   "cap_passed_usd": 2.7301,
+   "returncode": 0,
+   "result_file": "benefits-qa/qa.json",
+   "result_sha256": "fd6b8e394f7655e2340c5f3d78fccf69fd745577f13ae7c56ab967cd4ee9d9ce",
+   "measurement": {
+    "status": "measured",
+    "reason": null
+   }
+  },
+  {
+   "id": "benefits-impact",
+   "evaluator": "benefits_impact",
+   "status": "not_measured",
+   "notes": [],
+   "metrics": {},
+   "spend": {
+    "stage_usd": 1.067724,
+    "stage_calls": 10,
+    "cumulative_usd": 14.968899,
+    "cumulative_calls": 165
+   },
+   "started_at": "2026-10-07T04:07:15.517029+00:00",
+   "duration_s": 465.07,
+   "evaluator_sha256": "450c0e0452ac5a639766dd3d89b93bd87ccd58c4452ea81ff769c7745fbb01d1",
+   "evaluator_help_sha256": "c7891eafb1a2508d",
+   "estimate": {
+    "usd": 1.0276,
+    "source": "evaluator_plan",
+    "detail": "eval/benefits/impact_eval.py --dry-run -> plan.est_cost_usd",
+    "plan": {
+     "calls": 11,
+     "changes": 10,
+     "context": {
+      "mode": "retrieval",
+      "method": "bm25",
+      "spec_chars": 514171,
+      "budget_chars": 60000,
+      "chunks_total": 627
+     }
+    }
+   },
+   "estimated_usd": 1.0276,
+   "cap_passed_usd": 1.0988,
+   "returncode": 0,
+   "result_file": "benefits-impact/impact.json",
+   "result_sha256": "cd113c0795649425a7b67060349d26984a7f9d23b24ff90f114e11f5d83665f5",
+   "measurement": {
+    "status": "not_measured",
+    "reason": "9 of 10 changes answered, rule coverage graded for 0; budget guard: benefits:spec:impact estimated $0.0973 (+$0.0542 reserved for grading), spent $1.0677, cap $1.0988; budget guard: benefits:impact:judge estimated $0.0675, spent $1.0677, cap $1.0988"
+   },
+   "reason": "eval/benefits/impact_eval.py measured nothing: 9 of 10 changes answered, rule coverage graded for 0; budget guard: benefits:spec:impact estimated $0.0973 (+$0.0542 reserved for grading), spent $1.0677, cap $1.0988; budget guard: benefits:impact:judge estimated $0.0675, spent $1.0677, cap $1.0988"
+  },
+  {
+   "id": "benefits-fieldapp",
+   "evaluator": "benefits_fieldapp",
+   "status": "budget_exceeded",
+   "notes": [],
+   "metrics": {},
+   "spend": {},
+   "started_at": null,
+   "duration_s": null,
+   "evaluator_sha256": "fdc444aa736284d2dce8e211790e697e3c70eb139d8d1f1a9d32152f1827ef71",
+   "evaluator_help_sha256": "f702b83d08e6207d",
+   "estimate": {
+    "usd": 0.314,
+    "source": "evaluator_plan",
+    "detail": "eval/benefits/fieldapp_eval.py --dry-run -> plan.est_cost_usd",
+    "plan": {
+     "calls": 2,
+     "key_items": 14,
+     "context": {
+      "mode": "retrieval",
+      "method": "bm25",
+      "spec_chars": 514171,
+      "budget_chars": 60000,
+      "chunks_total": 627
+     }
+    }
+   },
+   "estimated_usd": 0.314,
+   "reason": "estimated $0.3140 would take spend to $15.2829 over the $15.00 cap"
+  }
+ ],
+ "thresholds": [
+  {
+   "stage": "corpus-sanity",
+   "metric": "n_problems",
+   "min": null,
+   "max": 0,
+   "equals": null,
+   "value": 0,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "mutated-corpus-sanity",
+   "metric": "n_problems",
+   "min": null,
+   "max": 0,
+   "equals": null,
+   "value": 0,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "mutate-jc",
+   "metric": "applied",
+   "min": 6,
+   "max": null,
+   "equals": null,
+   "value": 6,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "mutate-jc",
+   "metric": "sanity_problem_count",
+   "min": null,
+   "max": 0,
+   "equals": null,
+   "value": 0,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "mutation-control-floor",
+   "metric": "overall.detection_rate_pct",
+   "min": null,
+   "max": 20.0,
+   "equals": null,
+   "value": 0.0,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "score-master-blend",
+   "metric": "citations.validity_pct",
+   "min": 99.0,
+   "max": null,
+   "equals": null,
+   "value": 99.8,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "score-master-blend",
+   "metric": "recall.any_match_pct",
+   "min": 80.0,
+   "max": null,
+   "equals": null,
+   "value": 92.2,
+   "verdict": "pass",
+   "reason": ""
+  },
+  {
+   "stage": "score-bottled",
+   "metric": "recall.any_match_pct",
+   "min": 80.0,
+   "max": null,
+   "equals": null,
+   "value": 94.1,
+   "verdict": "pass",
+   "reason": ""
+  }
+ ],
+ "smoke_llm_calls": 0,
+ "verdict": "budget exhausted",
+ "exit_code": 3
+}

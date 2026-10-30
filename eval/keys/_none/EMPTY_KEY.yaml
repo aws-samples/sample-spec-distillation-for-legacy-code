@@ -1,0 +1,11 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# An answer key with no items, used by eval/ci/suites/generic.yaml so that score.py runs its
+# deterministic, key-independent layers (citation validity, source coverage, structure) on code
+# that has no answer key yet. Recall and precision are not measured against it.
+corpus: none
+version: 1
+metadata:
+  note: no answer key; deterministic layers only
+items: []

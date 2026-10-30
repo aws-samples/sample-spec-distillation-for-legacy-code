@@ -1,0 +1,488 @@
+{
+ "meta": {
+  "version": "1.0.0",
+  "output_dir": "/work/demo/out/ap-fixture-run",
+  "source_root": "synthetic-corpus/ap-invoices",
+  "key": "synthetic-corpus/ap-invoices/ANSWER_KEY.yaml"
+ },
+ "provenance": {
+  "status": "ok",
+  "detail": "16/16 inventory entries verified by sha256",
+  "inventory_hash": "040d7b5fce6fb234c5680ef92c06b46f40acd704c747cd2fea08b63820a84e52",
+  "manifest_inventory_hash": "040d7b5fce6fb234c5680ef92c06b46f40acd704c747cd2fea08b63820a84e52",
+  "source_identity": "c16a3b0a7f384ecff65bdfc55de9176f1cecb3fc2edda91d4e2f33c010c5a0c4",
+  "inventory_entries": 16,
+  "verified": 16,
+  "missing_from_source_root": [],
+  "digest_mismatch": [],
+  "untracked_in_source_root": []
+ },
+ "counts": {
+  "concept_nodes": 1258,
+  "concept_edges": 3440,
+  "code_source_files": 15,
+  "code_objects": 25,
+  "code_edges": 61,
+  "code_entities": 69,
+  "bridge_links": 837,
+  "source_files_on_disk": 16,
+  "parser_graph_nodes": 324,
+  "parser_graph_edges": 1405
+ },
+ "parity": {
+  "status": "ok",
+  "headline": {
+   "parser_confirmed_edge_precision_pct": 97.56,
+   "parser_edge_recall_pct": 66.67,
+   "pair_precision_pct": 100.0,
+   "pair_recall_pct": 68.0,
+   "f1_pct": 79.21
+  },
+  "typed": {
+   "llm_edges": 41,
+   "parser_edges": 60,
+   "confirmed": 40,
+   "false_positives": 1,
+   "missing": 20,
+   "precision_pct": 97.56,
+   "recall_pct": 66.67,
+   "f1_pct": 79.21
+  },
+  "pair": {
+   "llm_edges": 34,
+   "parser_edges": 50,
+   "confirmed": 34,
+   "false_positives": 0,
+   "missing": 16,
+   "precision_pct": 100.0,
+   "recall_pct": 68.0,
+   "f1_pct": 80.95
+  },
+  "by_source_language": {
+   "sql": {
+    "llm_edges": 41,
+    "parser_edges": 41,
+    "confirmed": 40,
+    "false_positives": 1,
+    "missing": 1,
+    "precision_pct": 97.56,
+    "recall_pct": 97.56,
+    "f1_pct": 97.56
+   },
+   "vbnet": {
+    "llm_edges": 0,
+    "parser_edges": 19,
+    "confirmed": 0,
+    "false_positives": 0,
+    "missing": 19,
+    "precision_pct": null,
+    "recall_pct": 0.0,
+    "f1_pct": 0.0
+   }
+  },
+  "false_positives": {
+   "total": 1,
+   "relation_mislabelled": 1,
+   "pair_not_in_parser": 0
+  }
+ },
+ "bridge_llm": {
+  "status": "ok",
+  "model": "us.anthropic.claude-sonnet-4-6",
+  "region": "us-west-2",
+  "temperature": 0.0,
+  "sample_requested": 30,
+  "sample_drawn": 30,
+  "judged": 30,
+  "sampled_without_a_concept_body": 0,
+  "sampled_concept_match_tiers": {
+   "id_stripped": 26,
+   "canonical": 4
+  },
+  "calls": 0,
+  "cache_hits": 30,
+  "cache_dir": "eval/graph/.cache/bridge",
+  "cost_usd": 0.0,
+  "max_cost_usd": 2.0,
+  "verdicts": {
+   "correct": 9,
+   "too_generic": 21
+  },
+  "agreement": {
+   "point_pct": 30.0,
+   "ci95_low_pct": 13.33,
+   "ci95_high_pct": 46.67,
+   "n": 30,
+   "iterations": 4000,
+   "seed": 7
+  },
+  "rows": [
+   {
+    "link_index": 36,
+    "concept": "domain_language::[DL-0025] Naming Conflict: Approval Threshold Duplicated Between Code and Config",
+    "symbol": "apcoparm",
+    "code_name": "dbo.apcoparm",
+    "code_path": "Scripts/Tables/AP_Tables.sql",
+    "match": "code_object",
+    "verdict": "correct",
+    "confidence": 0.95,
+    "reason": "The concept is directly about APCoParm.ApprThreshold drift risk; dbo.apcoparm is exactly that table containing the ApprThreshold column."
+   },
+   {
+    "link_index": 50,
+    "concept": "runtime::[RT-0017] Performance Boundary: Configurable Duplicate-Detection Lookback Window",
+    "symbol": "apcoparm",
+    "code_name": "dbo.apcoparm",
+    "code_path": "Scripts/Tables/AP_Tables.sql",
+    "match": "code_object",
+    "verdict": "correct",
+    "confidence": 0.98,
+    "reason": "APCoParm table contains DupDays column (default 90) which is exactly the configurable duplicate-detection lookback window described in the concept."
+   },
+   {
+    "link_index": 79,
+    "concept": "domain_language::[DL-0018] Entity: AP Company Parameters",
+    "symbol": "apcoparm",
+    "code_name": "APCoParm",
+    "code_path": "Scripts/StoredProcedures/usp_APInvPost.sql",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.97,
+    "reason": "APCoParm is directly queried in usp_APInvPost to retrieve ApprThreshold, matching the concept's company-level AP configuration entity exactly."
+   },
+   {
+    "link_index": 87,
+    "concept": "history::[HI-0024] Discovered Requirement: Large job invoices require a lien waiver before compliance hold-free payment",
+    "symbol": "apcoparm",
+    "code_name": "APCoParm",
+    "code_path": "Scripts/StoredProcedures/usp_APInvPost.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APCoParm is a shared company-parameters table referenced broadly; the concept is specifically about the LienWvrThreshold field and LW hold logic, not APCoParm as a whole."
+   },
+   {
+    "link_index": 100,
+    "concept": "data::[DT-0047] Entity: Company AP Parameters",
+    "symbol": "apcoparm",
+    "code_name": "APCoParm",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.97,
+    "reason": "The symbol APCoParm is directly queried in GetCoParms, selecting all concept-defined attributes (ApprThreshold, DupDays, LienWvrThreshold, DfltRetgPct, LastMthSubClsd, AllowFutureInv) scoped by APCo \u2014 an exact match."
+   },
+   {
+    "link_index": 174,
+    "concept": "state::[ST-0026] Transition: APHold [Open] \u2192 [Released]",
+    "symbol": "apholdcode",
+    "code_name": "APHoldCode",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APHoldCode is a reference/lookup table used by the transition, but the concept is about the Open\u2192Released transition itself (APHold rows, RelDate/RelBy, usp_APHoldRelease), not the hold code definition entity."
+   },
+   {
+    "link_index": 213,
+    "concept": "state::[ST-0003] Guard: Approval Amount Within Role Limit",
+    "symbol": "apinvhdr",
+    "code_name": "dbo.apinvhdr",
+    "code_path": "Scripts/Tables/AP_Tables.sql",
+    "match": "code_object",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APInvHdr is the invoice header table referenced in the guard, but the concept is specifically about the approval limit check logic, not the table itself."
+   },
+   {
+    "link_index": 235,
+    "concept": "data::[DT-0036] Posting Blocked in Closed GL Month",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "ClientSide/AP/AP/modAPGlobals.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is an affected entity in the concept, but the concept is specifically about GL month closure blocking posting, not the invoice header table/entity itself. The symbol here is a utility globals module defining invoice status constants, not the posting-block logic."
+   },
+   {
+    "link_index": 250,
+    "concept": "rule::[RL-0012] Invariant: Invoice Lines Must Balance to Header Total",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "ClientSide/AP/AP/modAPGlobals.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.85,
+    "reason": "APInvHdr here is a column/table name referenced in status-code constants, not the balancing invariant itself; the concept is about the posting rule, not this utility module."
+   },
+   {
+    "link_index": 270,
+    "concept": "data::[DT-0022] Only Non-Entering User May Approve (Segregation of Duties)",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/StoredProcedures/usp_APInvApprove.sql",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.97,
+    "reason": "APInvHdr is the exact table storing EntBy and ApprBy fields that enforce the segregation-of-duties invariant described in the concept."
+   },
+   {
+    "link_index": 288,
+    "concept": "interface::[IF-0041] Obligation: Invoice Lines Must Balance to Header Total",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/StoredProcedures/usp_APInvApprove.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APInvHdr is the header table referenced in the balance check, but the concept is about the balancing obligation/rule, not the table itself. The symbol also appears in usp_APInvApprove, not usp_APInvPost where the rule is evidenced."
+   },
+   {
+    "link_index": 296,
+    "concept": "state::[ST-0006] Guard: GL Month Must Be Open to Post",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/StoredProcedures/usp_APInvApprove.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is the invoice header table referenced broadly; the concept is specifically about the GL month open/closed guard logic, not the table itself."
+   },
+   {
+    "link_index": 313,
+    "concept": "data::[DT-0033] Frozen Financial Fields on Posted Invoice",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/StoredProcedures/usp_APInvPost.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is the affected table/entity, but the concept is specifically about the trigger trg_APInvHdr_u enforcing frozen fields, not the stored procedure usp_APInvPost or the table itself."
+   },
+   {
+    "link_index": 342,
+    "concept": "state::[ST-0019] Guard: Posted Invoice Core Fields Frozen",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/StoredProcedures/usp_APInvPost.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "The concept is about a trigger guard on APInvHdr; the symbol is the table used broadly across many procedures, not the specific guard logic."
+   },
+   {
+    "link_index": 378,
+    "concept": "state::[ST-0008] Guard: 1099 Vendor Must Have TIN Before Posting",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APInvHdr is the table/entity the guard applies to, but the concept is specifically about the TIN validation guard logic, not the AP Invoice Header entity itself."
+   },
+   {
+    "link_index": 395,
+    "concept": "data::[DT-0036] Posting Blocked in Closed GL Month",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/Triggers/trg_APInvHdr_u.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is the affected entity in the concept, but the concept is specifically about GLMthStat controlling posting to closed GL months, not about the invoice header table/trigger itself."
+   },
+   {
+    "link_index": 405,
+    "concept": "exception::[EX-0026] Edge Case: Retainage Holds Do Not Block Returning Invoice to Approved Status",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "Scripts/Triggers/trg_APInvHdr_u.sql",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is the table the concept references, but the concept is specifically about the stored procedure usp_APHoldRelease logic excluding RET holds, not the trigger on APInvHdr."
+   },
+   {
+    "link_index": 444,
+    "concept": "domain_language::[DL-0072] Rule: Posted Invoice Core Fields Are Frozen",
+    "symbol": "apinvhdr",
+    "code_name": "APInvHdr",
+    "code_path": "ClientSide/AP/AP/frmAPInvoiceApproval.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "APInvHdr is the table queried in the UI form, but the concept is specifically about the trigger trg_APInvHdr_u enforcing frozen fields on posted invoices, not the approval UI form."
+   },
+   {
+    "link_index": 495,
+    "concept": "rule::[RL-0012] Invariant: Invoice Lines Must Balance to Header Total",
+    "symbol": "apinvline",
+    "code_name": "APInvLine",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APInvLine is a data table/entity used by the invariant, but the concept is about the balancing rule (usp_APInvPost), not the line entity itself."
+   },
+   {
+    "link_index": 539,
+    "concept": "interface::[IF-0011] Obligation: Duplicate Invoice Detection for Non-Credit Transactions",
+    "symbol": "apref",
+    "code_name": "APRef",
+    "code_path": "Scripts/StoredProcedures/usp_APDupCheck.sql",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.97,
+    "reason": "APRef is a direct parameter of usp_APDupCheck, the exact stored procedure named in the concept as implementing duplicate invoice detection."
+   },
+   {
+    "link_index": 594,
+    "concept": "rule::[RL-0052] Rule: 1099 Vendors Must Have a TIN Before Posting",
+    "symbol": "apvend",
+    "code_name": "APVend",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "APVend is the vendor table referenced by the rule, but the symbol here is a DAL class/query wrapper, not the rule itself about TIN validation before posting."
+   },
+   {
+    "link_index": 642,
+    "concept": "state::[ST-0022] Guard: Status Transition Whitelist",
+    "symbol": "clsapinvoicebl",
+    "code_name": "clsapinvoicebl",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceBL.vb",
+    "match": "code_object",
+    "verdict": "too_generic",
+    "confidence": 0.85,
+    "reason": "The concept is about the DB trigger's transition whitelist; clsAPInvoiceBL is only mentioned as a counterpart reference, not the subject of the concept."
+   },
+   {
+    "link_index": 645,
+    "concept": "domain_language::[DL-0028] Action: Post Invoice",
+    "symbol": "clsapinvoicedal",
+    "code_name": "clsapinvoicedal",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_object",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "The concept is specifically about the Post Invoice action/workflow; clsAPInvoiceDAL is a broad DAL class covering many AP invoice operations, not solely PostInvoice."
+   },
+   {
+    "link_index": 666,
+    "concept": "rule::[RL-0056] Constraint: Cannot Post to a Closed GL Period",
+    "symbol": "glmthstat",
+    "code_name": "dbo.glmthstat",
+    "code_path": "Scripts/Tables/AP_Tables.sql",
+    "match": "code_object",
+    "verdict": "correct",
+    "confidence": 0.98,
+    "reason": "The concept is explicitly about GLMthStat.Status='C' blocking posts; the symbol is exactly that table with GLCo, Mth, Status columns."
+   },
+   {
+    "link_index": 707,
+    "concept": "permission::[PM-0027] Permission: Lien Waiver Threshold Allows Conditional Entry With Hold",
+    "symbol": "invoice.job",
+    "code_name": "Job",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceBL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.82,
+    "reason": "The concept is about the lien waiver threshold/hold permission logic; `invoice.Job` is just a field used as a condition, not the subject of the permission rule. The symbol `Job` in clsAPInvoiceBL.vb is a generic job-cost column used across many validations, not specifically about the lien waiver hold logic."
+   },
+   {
+    "link_index": 708,
+    "concept": "rule::[RL-0037] Constraint: Lien Waiver Required Above Threshold for Job Invoices",
+    "symbol": "invoice.job",
+    "code_name": "Job",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceBL.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "The concept is about the lien waiver payment constraint; `invoice.Job` is a field reference used in the rule, not the core subject. The symbol `Job` (Job Cost entity) is a supporting attribute, not what the rule is about."
+   },
+   {
+    "link_index": 745,
+    "concept": "data::[DT-0044] Entity: Job (Construction Project)",
+    "symbol": "jcjob",
+    "code_name": "JCJob",
+    "code_path": "ClientSide/AP/AP/clsAPInvoiceDAL.vb",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.95,
+    "reason": "Code directly queries JCJob table for JobStatus, matching the concept's definition of Job entity with JobStatus attribute gating retainage release."
+   },
+   {
+    "link_index": 759,
+    "concept": "data::[DT-0044] Entity: Job (Construction Project)",
+    "symbol": "jcjob",
+    "code_name": "JCJob",
+    "code_path": "ClientSide/AP/AP/frmAPInvoiceApproval.vb",
+    "match": "code_entity",
+    "verdict": "correct",
+    "confidence": 0.97,
+    "reason": "JCJob is directly joined in the SQL to filter invoices by job/project manager, matching the concept's definition of a construction project entity with ProjMgr attribute and APInvHdr relationship."
+   },
+   {
+    "link_index": 768,
+    "concept": "rule::[RL-0018] Rule: Retainage Can Only Be Released When Job Is Complete",
+    "symbol": "jcjob",
+    "code_name": "JCJob",
+    "code_path": "ClientSide/AP/AP/frmAPInvoiceApproval.vb",
+    "match": "code_entity",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "JCJob appears here only as a JOIN to filter the invoice queue by PM; the rule's core logic (JobStatus >= 2 blocking retainage release) lives in usp_APRetgCompute, not this form."
+   },
+   {
+    "link_index": 791,
+    "concept": "exception::[EX-0032] Override: Controller/CFO Duplicate Invoice Override",
+    "symbol": "secuser",
+    "code_name": "dbo.secuser",
+    "code_path": "Scripts/Tables/AP_Tables.sql",
+    "match": "code_object",
+    "verdict": "too_generic",
+    "confidence": 0.72,
+    "reason": "SecUser is a supporting lookup table used to validate the override actor's role/status; the concept is about the duplicate invoice override process itself, not the user table."
+   }
+  ],
+  "note": "agreement = share of sampled links the judge calls `correct`; `too_generic` marks a link where the symbol is real but is not what the concept is about."
+ },
+ "thresholds": {
+  "parser_confirmed_edge_precision_pct": 97.56,
+  "parser_confirmed_pair_precision_pct": 100.0,
+  "parser_edge_recall_pct": 66.67,
+  "parser_edge_recall_sql_pct": 97.56,
+  "parser_edge_fp_not_in_parser": 0,
+  "bridge_symbol_occurrence_pct": 91.76,
+  "bridge_symbol_occurrence_bare_pct": 100.0,
+  "bridge_name_absent_links": 0,
+  "bridge_concept_resolution_pct": 100.0,
+  "bridge_concept_exact_key_pct": 0.0,
+  "bridge_unresolved_concept_keys": 0,
+  "code_object_anchor_pct": 100.0,
+  "code_entity_anchor_pct": 97.1,
+  "code_edge_anchor_pct": 100.0,
+  "anchor_claims_contradicted": 0,
+  "source_file_resolve_pct": 100.0,
+  "concept_orphan_pct": 0.0,
+  "code_object_orphan_pct": 0.0,
+  "dangling_edges": 0,
+  "duplicate_node_ids": 0,
+  "self_loop_edges": 0,
+  "duplicate_edges": 0,
+  "same_as_contradictions": 0,
+  "contributes_to_cycles": 0,
+  "unified_id_mismatches": 0,
+  "key_item_coverage_any_pct": 100.0,
+  "key_item_coverage_full_pct": 58.33,
+  "key_items_missing": 0,
+  "key_location_recall_pct": 99.33,
+  "bridge_llm_agreement_pct": 30.0,
+  "bridge_llm_agreement_ci95_low_pct": 13.33,
+  "hard_structural_failures": 2
+ },
+ "gate_violations": []
+}

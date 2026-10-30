@@ -1,0 +1,311 @@
+{
+  "benefit": "B3 impact analysis",
+  "script": "impact_eval",
+  "tool": "raw-code",
+  "adapter": "raw-code",
+  "impact": "eval/benefits/fixtures/toy/impact.yaml",
+  "source_root": "eval/benefits/fixtures/toy/src",
+  "rule_method": "llm",
+  "context_truncated": false,
+  "summary": {
+    "changes": 2,
+    "changes_total": 2,
+    "location_recall_pct": 75.0,
+    "location_precision_pct": 33.3,
+    "file_recall_pct": 100.0,
+    "file_precision_pct": 50.0,
+    "rule_recall_pct": 100.0,
+    "rule_recall_by_location_pct": 100.0,
+    "report_recall_pct": null,
+    "contract_recall_pct": 100.0,
+    "all_copies_found_pct": 100.0,
+    "duplicate_groups_complete_pct": 100.0,
+    "invalid_locations": 0,
+    "predicted_locations": 9,
+    "answer_tokens_in": 3056,
+    "answer_tokens_out": 2311,
+    "answer_cost_usd": 0.0438,
+    "latency_avg_s": 17.61,
+    "errors": 0
+  },
+  "budget": {
+    "calls": 3,
+    "input_tokens": 4575,
+    "output_tokens": 2428,
+    "cost_usd": 0.0501,
+    "max_usd": 0.3,
+    "stopped": null
+  },
+  "changes": [
+    {
+      "id": "I-1",
+      "change": "The sales tax rate on invoice lines changes from its current value to 9%.",
+      "affected_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 20,
+          "end_line": 20,
+          "duplicate_group": "tax"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 35,
+          "end_line": 35,
+          "duplicate_group": "tax"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 22,
+          "end_line": 22
+        }
+      ],
+      "affected_rules": [
+        "T-02"
+      ],
+      "affected_reports": [],
+      "affected_contracts": [
+        "SubmitInvoice"
+      ],
+      "predicted_locations": [
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 20,
+          "end_line": 20,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 32,
+          "end_line": 38,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "schema.sql",
+          "start_line": 8,
+          "end_line": 8,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "location_reasons": [
+        "Tax multiplier is hardcoded as 1.08 (8% tax). Must change to 1.09 to reflect the new 9% sales tax rate used in SubmitInvoice total calculation.",
+        "MAX_LINES comment says 'Max 10 lines per invoice' but value is 25 \u2014 unrelated, but MAX_AMOUNT threshold (line 9) and ERR_AMOUNT_LIMIT check (line 22) must be re-tested because the higher tax rate will increase totals, potentially causing previously-passing invoices to now exceed MAX_AMOUNT=100000.",
+        "RecalculateTotal uses a different tax multiplier of 1.07 (7%). This is already inconsistent with SubmitInvoice (1.08). With the change to 9%, this method must also be evaluated and updated to 1.09 if it is intended to reflect the same tax rate, or the discrepancy must be explicitly justified.",
+        "usp_SaveInvoice contains a business rule that overrides APPROVED status to PENDING_APPROVAL when @Total > 50000. With a higher tax rate (9% vs 8%), invoice totals will be larger, meaning more invoices will cross the 50000 threshold and be demoted to PENDING_APPROVAL. This logic must be re-tested against the new tax-inclusive totals.",
+        "The CHECK (Total > 0) constraint and DECIMAL(12,2) column definition must be re-verified to ensure the new tax-inclusive totals still fit within the column precision and satisfy the constraint under edge cases."
+      ],
+      "predicted_rules": [
+        "Invoice line totals are calculated as Qty * UnitPrice * 1.08 (8% sales tax); this multiplier must change to 1.09 (9% sales tax) in SubmitInvoice.",
+        "The maximum invoice total allowed is 100,000; with a higher tax rate, previously-valid invoices near the limit may now exceed ERR_AMOUNT_LIMIT and be rejected.",
+        "Invoices with total > 50,000 submitted with APPROVED status are automatically demoted to PENDING_APPROVAL by the stored procedure; more invoices will now cross this threshold due to the higher tax rate.",
+        "Vendor codes starting with 'ZZ' receive automatic APPROVED status; this auto-approval combined with the new tax rate increases the likelihood of the >50,000 demotion rule being triggered for ZZ vendors.",
+        "RecalculateTotal uses a 7% tax multiplier (1.07), which is already inconsistent with SubmitInvoice (1.08); both must be reconciled to 9% (1.09) if they are intended to represent the same tax rate.",
+        "The IsOverdue 30-day rule is not affected by the tax rate change.",
+        "The LegacyDiscount 2% discount is not affected by the tax rate change, but if applied post-tax its monetary effect will change due to higher tax-inclusive totals."
+      ],
+      "predicted_reports": [
+        "Any invoice total or tax summary report consuming the Total column from the Invoice table (totals will be higher for all new invoices)",
+        "Any approval-rate or PENDING_APPROVAL vs APPROVED status distribution report (more invoices will be demoted by the >50,000 rule in usp_SaveInvoice)",
+        "Any report using RecalculateTotal output (currently uses 7% tax, inconsistent with the 8% stored value and the proposed 9%)"
+      ],
+      "predicted_contracts": [
+        "SubmitInvoice public API (InvoiceService.vb lines 11-30): return value behaviour changes \u2014 more callers will receive ERR_AMOUNT_LIMIT for high-value invoices; ZZ-vendor callers may receive PENDING_APPROVAL instead of APPROVED for invoices between ~45,872 and 50,000 pre-tax",
+        "usp_SaveInvoice stored procedure (schema.sql lines 15-24): the @Total > 50000 threshold check will be triggered more frequently due to higher tax-inclusive totals, changing the stored Status for a broader set of invoices",
+        "RecalculateTotal public API (InvoiceService.vb lines 32-38): currently returns a different tax rate (7%) than SubmitInvoice (8%); any external caller relying on this value for reconciliation will see a changed result if updated to 9%",
+        "Field device external API documented as 'Max 10 lines per invoice' (comment line 7) but enforcing MAX_LINES=25: no change to line limit, but callers near the amount limit will experience new rejections due to higher per-line tax"
+      ],
+      "expected_hit": [
+        {
+          "loc": {
+            "file": "InvoiceService.vb",
+            "start_line": 20,
+            "end_line": 20,
+            "duplicate_group": "tax"
+          },
+          "hit": true
+        },
+        {
+          "loc": {
+            "file": "InvoiceService.vb",
+            "start_line": 35,
+            "end_line": 35,
+            "duplicate_group": "tax"
+          },
+          "hit": true
+        },
+        {
+          "loc": {
+            "file": "InvoiceService.vb",
+            "start_line": 22,
+            "end_line": 22
+          },
+          "hit": false
+        }
+      ],
+      "loc_tp": 2,
+      "loc_n_expected": 3,
+      "loc_pred_tp": 2,
+      "loc_n_pred": 5,
+      "file_tp": 1,
+      "file_n_expected": 1,
+      "file_n_pred": 2,
+      "invalid_locations": 0,
+      "duplicate_groups": {
+        "tax": true
+      },
+      "all_copies_found": true,
+      "rule_loc_hit": {
+        "T-02": true
+      },
+      "reports_hit": {},
+      "contracts_hit": {
+        "SubmitInvoice": true
+      },
+      "tokens_in": 1526,
+      "tokens_out": 1328,
+      "cost_usd": 0.024498,
+      "latency_s": 19.5,
+      "error": null,
+      "rules_covered": [
+        "T-02"
+      ],
+      "rule_method": "llm",
+      "rule_note": "Tool explicitly identifies both SubmitInvoice (1.08) and RecalculateTotal (1.07) multiplier inconsistency as affected."
+    },
+    {
+      "id": "I-2",
+      "change": "Increase the automatic approval ceiling for ZZ vendors from 50000 to 75000.",
+      "affected_locations": [
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21
+        }
+      ],
+      "affected_rules": [
+        "T-04",
+        "T-03"
+      ],
+      "affected_reports": [],
+      "affected_contracts": [
+        "usp_SaveInvoice"
+      ],
+      "predicted_locations": [
+        {
+          "file": "schema.sql",
+          "start_line": 20,
+          "end_line": 21,
+          "resolved": "schema.sql",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 9,
+          "end_line": 9,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 24,
+          "end_line": 27,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        },
+        {
+          "file": "InvoiceService.vb",
+          "start_line": 18,
+          "end_line": 22,
+          "resolved": "InvoiceService.vb",
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "location_reasons": [
+        "The stored procedure usp_SaveInvoice contains the hard-coded ceiling of 50000 that overrides APPROVED status to PENDING_APPROVAL for ZZ vendors. This threshold must be raised to 75000 to implement the change.",
+        "MAX_AMOUNT is set to 100000. Although it does not encode the 50000 ceiling directly, it must be re-tested to confirm the new 75000 ceiling does not interact unexpectedly with the overall amount limit, and any documentation/comments referencing approval thresholds here should be reviewed.",
+        "The SubmitInvoice method sets status to APPROVED for ZZ-prefixed vendors unconditionally in application code, then relies on the stored procedure to demote to PENDING_APPROVAL above the ceiling. The interaction between this logic and the new 75000 ceiling in the stored procedure must be re-tested to ensure the end-to-end approval flow is correct for totals between 50000 and 75000.",
+        "Total calculation and MAX_AMOUNT guard must be re-tested against the new 75000 ceiling to verify no edge-case overlap between the approval ceiling and the amount limit, particularly for ZZ vendors submitting invoices near 75000."
+      ],
+      "predicted_rules": [
+        "ZZ-prefixed vendors whose invoice total exceeds 50000 are automatically demoted from APPROVED to PENDING_APPROVAL; this ceiling must be raised to 75000.",
+        "ZZ-prefixed vendors are granted automatic APPROVED status in the application layer; the boundary at which that approval is preserved now extends from totals up to 50000 to totals up to 75000.",
+        "Invoices with totals between 50000 (exclusive) and 75000 (inclusive) submitted by ZZ vendors will now be stored with status APPROVED instead of PENDING_APPROVAL.",
+        "The overall invoice amount limit of 100000 remains unchanged, but the approval tier boundary within that limit shifts, creating a new effective range (75000\u2013100000) where ZZ vendor invoices are still demoted to PENDING_APPROVAL."
+      ],
+      "predicted_reports": [
+        "Any report filtering or aggregating invoices by Status (APPROVED vs PENDING_APPROVAL) for ZZ vendors, as the population of auto-approved invoices will grow to include totals up to 75000",
+        "Any audit or compliance report tracking invoices that bypassed manual approval, as more high-value ZZ-vendor invoices will now appear in that set",
+        "Any financial exposure or liability report based on automatically approved invoice totals, as the maximum auto-approved value per invoice increases from 50000 to 75000"
+      ],
+      "predicted_contracts": [
+        "usp_SaveInvoice (SQL stored procedure) \u2014 its internal business rule threshold changes from 50000 to 75000; any caller relying on the demotion behaviour for values between 50000 and 75000 will observe different output status",
+        "SubmitInvoice public API (InvoiceService.vb) \u2014 the observable return value for ZZ-vendor invoices with totals between 50000 and 75000 changes from PENDING_APPROVAL to APPROVED; field devices or downstream consumers of this return value must be re-tested",
+        "Invoice table (schema.sql) \u2014 the distribution of Status values written to the Invoice table changes, affecting any downstream ETL, integration, or system reading invoice status directly from the database"
+      ],
+      "expected_hit": [
+        {
+          "loc": {
+            "file": "schema.sql",
+            "start_line": 20,
+            "end_line": 21
+          },
+          "hit": true
+        }
+      ],
+      "loc_tp": 1,
+      "loc_n_expected": 1,
+      "loc_pred_tp": 1,
+      "loc_n_pred": 4,
+      "file_tp": 1,
+      "file_n_expected": 1,
+      "file_n_pred": 2,
+      "invalid_locations": 0,
+      "duplicate_groups": {},
+      "all_copies_found": null,
+      "rule_loc_hit": {
+        "T-04": true,
+        "T-03": true
+      },
+      "reports_hit": {},
+      "contracts_hit": {
+        "usp_SaveInvoice": true
+      },
+      "tokens_in": 1530,
+      "tokens_out": 983,
+      "cost_usd": 0.019335,
+      "latency_s": 15.72,
+      "error": null,
+      "rules_covered": [
+        "T-04",
+        "T-03"
+      ],
+      "rule_method": "llm",
+      "rule_note": "Tool identifies both the 50000 demotion rule and ZZ auto-approval logic as requiring changes."
+    }
+  ]
+}

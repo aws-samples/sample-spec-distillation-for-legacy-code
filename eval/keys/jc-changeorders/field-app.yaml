@@ -1,0 +1,214 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+#
+# Field-app compatibility key - synthetic JC Change Orders corpus. Tests the "build a new client against the
+# legacy contract" benefit: a NEW Android field app captures change-order requests and submits them through
+# the external API (clsJCFieldSync.ProcessRequest -> usp_JCCOFieldImport). Each item is a requirement the app
+# must respect to stay compatible with the core system, including rules that are only enforced server-side or
+# only by the database.
+# Paths are relative to synthetic-corpus/jc-changeorders/. Line ranges are 1-based, inclusive.
+#
+# kind: payload | validation | limit | status | behaviour | outbound
+# enforced_by: where the core system enforces it (vb = clsJCFieldSync, proc = stored procedure,
+#              db = constraint / column size / silent truncation, none = not enforced, app must self-police)
+
+corpus: jc-changeorders
+version: 1
+
+requirements:
+
+  - id: FA-01
+    kind: payload
+    requirement: >-
+      Send one change order request per call as a JSON object with these fields. Required: extRef (string),
+      job (string), description (string), coType (string), reasonCode (string), requestDate (string),
+      requestedBy (string) and items (array of objects). Optional: subcontract (string, required when
+      coType is SUB) and daysExtension (integer, default 0). Field names are case-sensitive camelCase.
+      Markup, tax and amounts are NOT accepted from the app; the server computes them.
+    enforced_by: [vb]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 117, end_line: 125}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 126, end_line: 173}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 250, end_line: 264}
+
+  - id: FA-02
+    kind: validation
+    requirement: >-
+      extRef must be a GUID string of exactly 36 characters (hyphenated form) and unique per request. Reuse
+      the same extRef when retrying. The server is idempotent: a repeated extRef returns result DUPLICATE with
+      the coNumber already created, and creates no new CO. A filtered unique index enforces this in the
+      database as well.
+    enforced_by: [vb, proc, db]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 135, end_line: 141}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 222, end_line: 223}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 35, end_line: 40}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 108, end_line: 108}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 119, end_line: 120}
+
+  - id: FA-03
+    kind: validation
+    requirement: >-
+      job must be an existing job number (max 10 characters). Jobs that are hard closed (status 3) are
+      rejected with JOB_CLOSED. Soft-closed jobs (status 2) are currently ACCEPTED by the API even though the
+      office screen refuses them, so the app should not rely on the API to stop requests on soft-closed jobs.
+    enforced_by: [proc]
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 42, end_line: 52}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 143, end_line: 143}
+      - {file: ClientSide/JC/JC/frmJCCOEntry.vb, start_line: 114, end_line: 119}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 36, end_line: 36}
+
+  - id: FA-04
+    kind: validation
+    requirement: >-
+      description is required, trimmed, and at most 60 characters. Longer values are rejected (INVALID), not
+      truncated.
+    enforced_by: [vb, db]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 145, end_line: 150}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 49, end_line: 49}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 85, end_line: 85}
+
+  - id: FA-05
+    kind: validation
+    requirement: >-
+      coType must be "OWNER" or "SUB" (case-insensitive). Internal change orders cannot come from the field.
+      For SUB, subcontract is required and must be an existing subcontract on the same job, otherwise the
+      result is NOT_FOUND.
+    enforced_by: [vb, proc]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 152, end_line: 160}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 54, end_line: 58}
+
+  - id: FA-06
+    kind: validation
+    requirement: >-
+      reasonCode must be an active reason code. Today that is OWN, UNF, DES, VAL or SCH; ALW is inactive and
+      is rejected. Do not offer VAL (value engineering) in the app. VAL change orders must be deducts
+      (negative), but the API cannot accept negative amounts, so a VAL request is accepted as a Draft and
+      then can never be submitted.
+    enforced_by: [vb, proc]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 162, end_line: 162}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 60, end_line: 64}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 223, end_line: 228}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 94, end_line: 98}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 196, end_line: 197}
+
+  - id: FA-07
+    kind: validation
+    requirement: >-
+      requestDate must use the exact format yyyy-MM-dd and must not be later than the server's local date
+      (the server does not handle time zones). For SUB requests, the office must submit within 21 days of
+      requestDate (company NoticeDays), or the CO is refused at submit. Send SUB requests promptly, and
+      never backdate them.
+    enforced_by: [vb, proc]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 164, end_line: 171}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 100, end_line: 105}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 23, end_line: 23}
+
+  - id: FA-08
+    kind: limit
+    requirement: >-
+      items must contain 1 to 20 entries. Each item rule:
+      - phase: required, max 20 characters (silently truncated by the database).
+      - costType: one of L, M, E, S, O.
+      - units: number greater than 0, max 3 decimals.
+      - unitCost: number >= 0, max 4 decimals.
+      - um: optional, max 3 characters (silently truncated), defaults to "LS".
+      - taxable: optional boolean, defaults to false.
+      Each line amount is computed server-side as round(units * unitCost, 2). Negative lines (credits) are
+      not possible from the field.
+    enforced_by: [vb, db]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 175, end_line: 206}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 53, end_line: 53}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 91, end_line: 101}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 132, end_line: 138}
+
+  - id: FA-09
+    kind: limit
+    requirement: >-
+      The sum of line amounts (cost before markup and tax) must not exceed the company FieldMaxAmt, currently
+      $25,000.00. Larger requests are rejected with LIMIT by the VB check; the proc re-checks and returns
+      INVALID. The value is a company parameter, so the app should not hardcode it.
+    enforced_by: [vb, proc]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 198, end_line: 198}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 208, end_line: 212}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 74}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 22, end_line: 22}
+
+  - id: FA-10
+    kind: validation
+    requirement: >-
+      requestedBy is required, and only the first 30 characters are kept (silently truncated). daysExtension
+      is optional and must be an integer from 0 to 365. The API does not validate the range: out-of-range
+      values fail the database CHECK and come back as DB_ERROR. The app must validate both.
+    enforced_by: [vb, db]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 173, end_line: 173}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 25, end_line: 26}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 91, end_line: 91}
+      - {file: Scripts/Tables/JC_Tables.sql, start_line: 115, end_line: 115}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 260, end_line: 260}
+
+  - id: FA-11
+    kind: status
+    requirement: >-
+      Response contract: {extRef, result, coNumber, status, errors}.
+      - result is ACCEPTED, DUPLICATE or REJECTED.
+      - coNumber is a 3-character string, or null when REJECTED.
+      - status is "RECEIVED", or null when REJECTED.
+      - errors is a list of {code, message}. Codes: REQUIRED, INVALID, LIMIT, NOT_FOUND, JOB_CLOSED, DB_ERROR.
+      Validation errors are all returned together. Malformed JSON returns REJECTED with INVALID and an empty
+      extRef. Store coNumber; it is needed for status lookups.
+    enforced_by: [vb]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 129, end_line: 133}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 214, end_line: 234}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 251, end_line: 265}
+
+  - id: FA-12
+    kind: status
+    requirement: >-
+      Status values the app must handle: RECEIVED (draft in the office), PENDING, APPROVED (both approved and
+      posted), REJECTED (with rejectReason), VOID, and UNKNOWN (CO not found or an unmapped status). The status
+      lookup takes job + coNumber, not extRef as the class header comment says. Owner COs on
+      time-and-material jobs can go straight from RECEIVED to APPROVED.
+    enforced_by: [vb]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCCOBL.vb, start_line: 237, end_line: 249}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 10, end_line: 10}
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 236, end_line: 246}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 110, end_line: 112}
+
+  - id: FA-13
+    kind: behaviour
+    requirement: >-
+      Amounts the app shows before approval are estimates only. The server applies the company default markup
+      (10%), not a markup chosen in the field. Subcontract COs have markup silently capped at 5% at submit.
+      Tax is added at the job rate on lines marked taxable. Final amounts come only from the outbound export.
+    enforced_by: [proc]
+    locations:
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 66, end_line: 66}
+      - {file: Scripts/StoredProcedures/usp_JCCOFieldImport.sql, start_line: 85, end_line: 89}
+      - {file: Scripts/StoredProcedures/usp_JCCOSubmit.sql, start_line: 87, end_line: 92}
+
+  - id: FA-14
+    kind: outbound
+    requirement: >-
+      The field backend must accept the export push: HTTP POST of JSON (utf-8) with an X-Api-Key header and a
+      30-second timeout. The body is {schemaVersion "2.1", company, changeOrders[]}, with at most 50 COs per
+      call. Each changeOrder has job, coNumber, extRef (null for office-entered COs), source (ERP or FIELD),
+      type (OWNER or SUB), status, description, reasonCode, subcontract, costAmount, markupAmount, taxAmount,
+      totalAmount (numbers with 2 decimals), daysExtension, approvedBy ("SYSTEM" for auto-approved COs),
+      approvedDate ("yyyy-MM-ddTHH:mm:ss", server local time, no zone) and requiresExecApproval (boolean).
+      Respond 200 or 202, or the whole batch is resent on the next run, so the backend must de-duplicate on
+      job + coNumber. Each CO is sent once: later changes such as voids are never pushed.
+    enforced_by: [vb]
+    locations:
+      - {file: ClientSide/JC/JC/clsJCFieldSync.vb, start_line: 40, end_line: 115}
+      - {file: ClientSide/JC/JC/clsJCCODAL.vb, start_line: 278, end_line: 287}
+      - {file: ClientSide/JC/JC/modJCGlobals.vb, start_line: 54, end_line: 56}

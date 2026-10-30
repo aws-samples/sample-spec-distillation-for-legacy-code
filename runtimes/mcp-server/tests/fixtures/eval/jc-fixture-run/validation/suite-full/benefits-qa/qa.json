@@ -1,0 +1,58 @@
+{
+ "benefit": "B2/B5 Q&A",
+ "script": "qa_eval",
+ "tool": "spec",
+ "adapter": "spec",
+ "qa": "eval/keys/jc-changeorders/qa.yaml",
+ "source_root": "synthetic-corpus/jc-changeorders",
+ "context_truncated": true,
+ "context": {
+  "mode": "retrieval",
+  "method": "bm25",
+  "spec_chars": 514171,
+  "budget_chars": 60000,
+  "chunks_total": 627
+ },
+ "measurement": {
+  "status": "measured",
+  "graded": 25,
+  "total": 25,
+  "what": "questions",
+  "reason": null
+ },
+ "summary": {
+  "measurement_status": "measured",
+  "questions": 25,
+  "questions_total": 25,
+  "questions_answered": 25,
+  "questions_graded": 25,
+  "correct_pct": 16.0,
+  "score_pct": 52.0,
+  "wrong": 3,
+  "engineer_correct_pct": 25.0,
+  "product_correct_pct": 0.0,
+  "trick_correct_pct": 20.0,
+  "trick_abstain_pct": 60.0,
+  "plain_language_avg": 2.62,
+  "answers_with_citations_pct": 92.0,
+  "citation_validity_pct": 100.0,
+  "citation_supported_pct": 73.9,
+  "citation_hits_reference_pct": 80.0,
+  "answer_tokens_in": 423486,
+  "answer_tokens_out": 11969,
+  "answer_cost_usd": 1.45,
+  "latency_avg_s": 7.05,
+  "errors": 0
+ },
+ "budget": {
+  "calls": 30,
+  "input_tokens": 468376,
+  "output_tokens": 15074,
+  "cost_usd": 1.6312,
+  "max_usd": 2.7301,
+  "stopped": null,
+  "region": "us-east-1",
+  "model": "us.anthropic.claude-sonnet-4-6"
+ },
+ "questions": []
+}

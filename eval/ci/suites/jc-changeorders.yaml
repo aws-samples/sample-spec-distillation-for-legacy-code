@@ -1,0 +1,200 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+#
+# Evaluation suite: synthetic JC Change Orders corpus (VB.NET WinForms + SQL Server).
+# The JC answer keys live OUTSIDE the corpus (eval/keys/jc-changeorders/), so a tool
+# under test cannot read them even if it is pointed at the corpus root.
+#
+#   python3 eval/ci/run_suite.py --config eval/ci/suites/jc-changeorders.yaml --smoke \
+#     --out eval/ci/runs/jc-smoke
+#   python3 eval/ci/run_suite.py --config eval/ci/suites/jc-changeorders.yaml \
+#     --var run=output/jc-changeorders --out eval/ci/runs/jc-full
+#
+#   # what would a full run cost, and what cap would each stage get? (no Bedrock calls)
+#   python3 eval/ci/run_suite.py --config eval/ci/suites/jc-changeorders.yaml \
+#     --var run=output/jc-changeorders --plan --out /tmp/jc-plan
+#
+# This corpus carries the four benefit keys (ANSWER_KEY, qa, impact, field-app), so the
+# suite covers benefit evaluation as well as spec recall. ${run} has no committed
+# reference run yet: without --var run=... every output-dependent stage is `skipped`.
+#
+# Cost: LLM stages carry no hand-written est_usd any more. run_suite.py asks each evaluator
+# for its own plan (score.py --dry-run-judge, benefits/* --dry-run) and falls back to the
+# measured table in ci/suite_lib.py (CALIBRATED_COSTS). On the JC run of 2026-10-06 one judge
+# pass of the business spec is ~$5.4 and of the full spec more, so the $3 default cap below
+# covers the deterministic stages and the cheap benefit stages; pass --budget-usd for more.
+
+suite: jc-changeorders
+schema_version: 1
+description: >-
+  Spec recall, Q&A, change-impact and field-app compatibility on the JC change-order
+  corpus, plus the deterministic layers (syntax sanity, defect injection, detection floor).
+
+vars:
+  # the analysed source; the launcher passes the run's own copy with --var source_root=...
+  source_root: synthetic-corpus/jc-changeorders
+  repo_root: ${source_root}
+  corpus: ${source_root}
+  keys: eval/keys/jc-changeorders
+  run: output/jc-changeorders
+  # B1 insights scores the run's Issues & Insights report, not the business spec (which
+  # score-bottled already judges). Override with --var insights_spec=PATH.
+  insights_spec: ${run}/issues/issues.md
+
+budget_usd: 3.0
+
+# score.py judge passes for every score stage (stages may override). score.py's own default
+# is 3; CI uses 1 so that the estimate, the cap and the spend all describe one pass. Raise it
+# for a reportable number (see "How to report these honestly" in eval/README.md).
+judge_runs: 1
+
+seeds:
+  mutate: 7
+
+corpora:
+  jc-changeorders:
+    source_root: ${corpus}
+    key: ${keys}/ANSWER_KEY.yaml
+    # the answer key is outside the corpus; only the corpus README describes the traps
+    exclude: [README.md]
+
+stages:
+  # ---------------------------------------------------------------- deterministic layers
+  - id: corpus-sanity
+    evaluator: sanity
+    path: ${corpus}
+    smoke: true
+    est_usd: 0.0
+
+  # avoid_key: no mutation may land within 2 lines of a seeded trap (a key item with flags).
+  # Seed 7 used to put MUT-002 (threshold_divergence, modJCGlobals.vb:70) two lines from the
+  # seeded BR-009 inconsistency, and the control run "detected" it before any injection.
+  - id: mutate-jc
+    evaluator: mutate
+    corpus_path: ${corpus}
+    mutations: 6
+    seed: 7
+    exclude: [README.md]
+    avoid_key: ["${keys}/ANSWER_KEY.yaml"]
+    avoid_key_margin: 2
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutated-corpus-sanity
+    evaluator: sanity
+    path: ${stage:mutate-jc}/corpus
+    smoke: true
+    est_usd: 0.0
+
+  - id: mutation-control-floor
+    evaluator: mutation_detect
+    mutations: ${stage:mutate-jc}/mutations.yaml
+    output: ${run}/master_blend/master_blend.md
+    source_root: ${stage:mutate-jc}/corpus
+    base_key: ${keys}/ANSWER_KEY.yaml
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  # deterministic and free, so it runs before any LLM stage: a budget abort cannot skip it
+  - id: graph-eval
+    evaluator: graph_eval
+    corpus: jc-changeorders
+    run_dir: ${run}
+    optional: true
+    smoke: true
+    est_usd: 0.0
+
+  # ---------------------------------------------------------------- spec scoring
+  - id: score-master-blend
+    evaluator: score
+    corpus: jc-changeorders
+    spec: ${run}/master_blend/master_blend.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  - id: score-bottled
+    evaluator: score
+    corpus: jc-changeorders
+    spec: ${run}/bottled_spec/bottled_spec.md
+    optional: true
+    smoke: true
+    args:
+      max-source-chars: 200000
+    smoke_args:
+      no-llm: true
+
+  # ---------------------------------------------------------------- benefit evaluation
+  - id: benefits-insights
+    evaluator: benefits_insights
+    corpus: jc-changeorders
+    spec: ${insights_spec}
+    optional: true
+    smoke: true
+    smoke_args:
+      no-llm: true
+
+  # qa_eval.py, impact_eval.py and fieldapp_eval.py answer with an LLM (impact's --no-llm only
+  # drops its rule judge), so they have no deterministic mode: skipped in --smoke with that
+  # reason recorded, run only in a full suite. The spec adapter answers from BM25-retrieved
+  # spec chunks (--max-spec-chars per question), not from a truncated prefix of the spec.
+  - id: benefits-qa
+    evaluator: benefits_qa
+    corpus: jc-changeorders
+    qa: ${keys}/qa.yaml
+    spec: ${run}/bottled_spec/bottled_spec.md
+    adapter: spec
+    optional: true
+
+  - id: benefits-impact
+    evaluator: benefits_impact
+    corpus: jc-changeorders
+    impact: ${keys}/impact.yaml
+    spec: ${run}/bottled_spec/bottled_spec.md
+    adapter: spec
+    optional: true
+
+  - id: benefits-fieldapp
+    evaluator: benefits_fieldapp
+    corpus: jc-changeorders
+    key: ${keys}/field-app.yaml
+    spec: ${run}/bottled_spec/bottled_spec.md
+    adapter: spec
+    optional: true
+
+
+thresholds:
+  - stage: corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutated-corpus-sanity
+    metric: n_problems
+    max: 0
+    applies_in_smoke: true
+  - stage: mutate-jc
+    metric: applied
+    min: 6
+    applies_in_smoke: true
+  - stage: mutate-jc
+    metric: sanity_problem_count
+    max: 0
+    applies_in_smoke: true
+  - stage: mutation-control-floor
+    metric: overall.detection_rate_pct
+    max: 20.0
+    applies_in_smoke: true
+  - stage: score-master-blend
+    metric: citations.validity_pct
+    min: 99.0
+    applies_in_smoke: true
+  - stage: score-master-blend
+    metric: recall.any_match_pct
+    min: 80.0
+  - stage: score-bottled
+    metric: recall.any_match_pct
+    min: 80.0

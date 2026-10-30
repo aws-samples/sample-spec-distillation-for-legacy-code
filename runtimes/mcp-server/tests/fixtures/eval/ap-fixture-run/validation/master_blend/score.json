@@ -1,0 +1,215 @@
+{
+ "spec": "/work/demo/out/ap-fixture-run/master_blend/master_blend.md",
+ "key": "synthetic-corpus/ap-invoices/ANSWER_KEY.yaml",
+ "source_root": "../synthetic-corpus/ap-invoices",
+ "method": "llm",
+ "counts": {
+  "key_items": 48,
+  "core_items": 0,
+  "findings": 1278,
+  "citations": 1500
+ },
+ "recall": {
+  "strict_full_pct": 89.6,
+  "partial_credit_pct": 92.7,
+  "any_match_pct": 95.8,
+  "core_full_pct": null,
+  "core_any_pct": null
+ },
+ "precision": {
+  "keyed_pct": 86.5,
+  "correct_pct": 88.3,
+  "findings_matched": 1105,
+  "correct_extra": 24,
+  "unsupported": 149,
+  "incorrect": 1
+ },
+ "citations": {
+  "validity_pct": 99.5,
+  "valid": 1493,
+  "invalid": 7,
+  "accuracy_pct": 76.9,
+  "findings_without_citation": 274
+ },
+ "possible_inventions": [
+  {
+   "finding_id": "F982",
+   "verdict": "incorrect",
+   "note": "Claims UI denies auto-approve at >=10000 but DB uses strictly greater than, missing the inconsistency documented in BR-020.",
+   "invalid_citations": [],
+   "text": "#### [PM-0008] Access Rule: Invoices At or Above Threshold Require Approval\n<!-- ref:8bbf81f3 -->\n- Definition: Any invo"
+  }
+ ],
+ "key_coverage": {
+  "BR-001": "full",
+  "BR-002": "full",
+  "BR-003": "full",
+  "BR-004": "full",
+  "BR-005": "full",
+  "BR-006": "full",
+  "BR-007": "full",
+  "BR-008": "full",
+  "BR-009": "full",
+  "BR-010": "full",
+  "BR-011": "full",
+  "BR-012": "full",
+  "BR-013": "full",
+  "BR-014": "full",
+  "BR-015": "full",
+  "BR-016": "full",
+  "BR-017": "full",
+  "BR-018": "full",
+  "BR-019": "full",
+  "BR-020": "full",
+  "BR-021": "full",
+  "BR-022": "full",
+  "BR-023": "full",
+  "BR-024": "full",
+  "BR-025": "full",
+  "BR-026": "full",
+  "BR-027": "full",
+  "BR-028": "full",
+  "BR-029": "full",
+  "BR-030": "full",
+  "ST-001": "full",
+  "ST-002": "full",
+  "ST-003": "full",
+  "ST-004": "full",
+  "ST-005": "full",
+  "ST-006": "full",
+  "ST-100": "full",
+  "WF-001": "full",
+  "WF-002": "full",
+  "WF-003": "full",
+  "WF-004": "partial",
+  "EX-001": "partial",
+  "EX-002": "full",
+  "EX-003": "full",
+  "EX-004": "partial",
+  "EX-005": "full",
+  "EX-006": "missed",
+  "EX-007": "missed"
+ },
+ "recall_by": {
+  "type": {
+   "exception": {
+    "n": 7,
+    "full": 3,
+    "partial": 2,
+    "missed": 2,
+    "full_pct": 42.9,
+    "any_pct": 71.4
+   },
+   "rule": {
+    "n": 30,
+    "full": 30,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "state": {
+    "n": 7,
+    "full": 7,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "workflow": {
+    "n": 4,
+    "full": 3,
+    "partial": 1,
+    "missed": 0,
+    "full_pct": 75.0,
+    "any_pct": 100.0
+   }
+  },
+  "evidence": {
+   "Confirmation Required": {
+    "n": 3,
+    "full": 3,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "Inferred": {
+    "n": 4,
+    "full": 4,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "Unknown": {
+    "n": 3,
+    "full": 1,
+    "partial": 0,
+    "missed": 2,
+    "full_pct": 33.3,
+    "any_pct": 33.3
+   },
+   "Verified": {
+    "n": 38,
+    "full": 35,
+    "partial": 3,
+    "missed": 0,
+    "full_pct": 92.1,
+    "any_pct": 100.0
+   }
+  },
+  "flag": {
+   "(none)": {
+    "n": 42,
+    "full": 37,
+    "partial": 3,
+    "missed": 2,
+    "full_pct": 88.1,
+    "any_pct": 95.2
+   },
+   "comment_only": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "db_only": {
+    "n": 1,
+    "full": 1,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "dead_code": {
+    "n": 2,
+    "full": 2,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   },
+   "inconsistency": {
+    "n": 2,
+    "full": 2,
+    "partial": 0,
+    "missed": 0,
+    "full_pct": 100.0,
+    "any_pct": 100.0
+   }
+  }
+ },
+ "segmentation": {
+  "merged_entry_findings": 1004
+ },
+ "judge_usage": {
+  "input_tokens": 1739170,
+  "output_tokens": 57875,
+  "cost_usd": 6.085635,
+  "calls": 32
+ },
+ "generation_usage": null
+}

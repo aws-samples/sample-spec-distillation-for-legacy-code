@@ -1,0 +1,3 @@
+# Content-addressed judge cache: reproducible from Bedrock, not worth committing.
+.cache/
+__pycache__/

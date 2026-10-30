@@ -1,0 +1,19 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Toy Q&A set for eval/benefits/qa_eval.py self-tests.
+questions:
+  - id: Q-E1
+    audience: engineer
+    question: What is the maximum number of lines an invoice submitted through SubmitInvoice can have, and what is returned when it is exceeded?
+    reference_answer: 25 lines (MAX_LINES = 25); more returns ERR_TOO_MANY_LINES. The comment saying 10 is stale.
+    locations: [{file: InvoiceService.vb, start_line: 8, end_line: 8}, {file: InvoiceService.vb, start_line: 16, end_line: 16}]
+  - id: Q-P1
+    audience: product
+    question: Can any supplier have invoices approved automatically without a person reviewing them?
+    reference_answer: Yes. Suppliers whose code starts with "ZZ" are approved automatically, but only for invoices up to 50,000; larger ones still go to approval.
+    locations: [{file: InvoiceService.vb, start_line: 24, end_line: 27}, {file: schema.sql, start_line: 20, end_line: 21}]
+  - id: Q-T1
+    audience: trick
+    question: What exact sales tax rate does the system apply to invoice totals?
+    reference_answer: Cannot be determined as a single rate - the code is inconsistent. SubmitInvoice uses 8% (1.08) and RecalculateTotal uses 7% (1.07) with different rounding.
+    locations: [{file: InvoiceService.vb, start_line: 20, end_line: 20}, {file: InvoiceService.vb, start_line: 35, end_line: 35}]

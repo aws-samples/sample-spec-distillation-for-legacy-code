@@ -1,0 +1,26 @@
+{
+ "created_at": "2026-10-07T02:57:57Z",
+ "env_snapshot": {
+  "AWS_DEFAULT_REGION": "us-east-1",
+  "DISTILL_MAX_USD": "25",
+  "DISTILL_OUTPUT": "/work/jc2/out",
+  "DISTILL_TARGET": "/work/jc2/src",
+  "DISTILL_TARGET_NAME": "jc-changeorders",
+  "DISTILL_TELEMETRY_DIR": "/work/jc2/out/telemetry"
+ },
+ "params": {
+  "model_id": "us.anthropic.claude-sonnet-4-6",
+  "region": "us-east-1"
+ },
+ "paths": {
+  "ids_db": "output:stills/ids.db",
+  "pages_dir": "output:.pages",
+  "shared_vectors_db": "output:stills/shared_vectors.db",
+  "stills_dir": "output:stills",
+  "viewer_dir": "output:viewer"
+ },
+ "run_id": "e9c1e8ee-7cc4-470b-b7d5-c10c34eaced7",
+ "schema_version": 1,
+ "tool_version": "0.2.0",
+ "updated_at": "2026-10-07T02:57:57Z"
+}

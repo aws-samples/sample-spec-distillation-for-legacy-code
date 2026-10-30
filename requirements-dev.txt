@@ -1,0 +1,8 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+# Test and evaluation-harness dependencies (no AWS needed for the unit tests).
+-r runtimes/mcp-server/requirements.txt
+-r runtimes/pipeline/requirements.txt
+pytest>=8.0
+hypothesis>=6.0
+jsonschema>=4.0

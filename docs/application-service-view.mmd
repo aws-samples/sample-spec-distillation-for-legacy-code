@@ -1,0 +1,25 @@
+%% Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+%% SPDX-License-Identifier: MIT-0
+flowchart TB
+    U["User (browser)"]
+
+    subgraph app["Illustrative production shape (not part of this sample)"]
+        CF["CloudFront + WAF<br/>(HTTPS, request filtering)"]
+        AUTH["Authentication<br/>(per-user sign-in)"]
+        WEB["Web / API service<br/>(containers on ECS Fargate —<br/>scales with traffic)"]
+        JOBS["Distillation workers<br/>(container fleet — run the pipeline<br/>in parallel, scale with workload)"]
+    end
+
+    subgraph aws["AWS services it uses"]
+        BR["Amazon Bedrock<br/>(the AI — reads code,<br/>writes the specification)"]
+        S3["Amazon S3<br/>(source code in,<br/>spec + viewer out)"]
+        KG["Graph + vector store<br/>(for example Amazon Neptune)"]
+    end
+
+    U --> CF --> AUTH --> WEB --> JOBS
+    WEB --> BR
+    JOBS --> BR
+    JOBS --> S3
+    JOBS --> KG
+    WEB --> S3
+    WEB --> KG

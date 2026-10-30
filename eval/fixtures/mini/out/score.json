@@ -1,0 +1,202 @@
+{
+  "spec": "fixtures/mini/spec.md",
+  "key": "fixtures/mini/key.yaml",
+  "source_root": "fixtures/mini/src",
+  "method": "llm",
+  "counts": {
+    "key_items": 4,
+    "core_items": 2,
+    "findings": 6,
+    "citations": 6
+  },
+  "recall": {
+    "strict_full_pct": 75.0,
+    "partial_credit_pct": 75.0,
+    "any_match_pct": 75.0,
+    "core_full_pct": 100.0,
+    "core_any_pct": 100.0
+  },
+  "precision": {
+    "keyed_pct": 50.0,
+    "correct_pct": 66.7,
+    "findings_matched": 3,
+    "correct_extra": 1,
+    "unsupported": 0,
+    "incorrect": 2
+  },
+  "citations": {
+    "validity_pct": 83.3,
+    "valid": 5,
+    "invalid": 1,
+    "accuracy_pct": 100.0,
+    "findings_without_citation": 0
+  },
+  "possible_inventions": [
+    {
+      "finding_id": "F3",
+      "verdict": "incorrect",
+      "note": "No discount logic exists in the source; ELSE branch simply computes total.",
+      "invalid_citations": [],
+      "text": "- A 10% discount is applied to orders above 50 units (calc.cob:L12-L13)."
+    },
+    {
+      "finding_id": "F4",
+      "verdict": "incorrect",
+      "note": "No ORDERS file or audit write exists; source only displays total to screen.",
+      "invalid_citations": [
+        "calc.cob:L40-L45"
+      ],
+      "text": "- The order total is written to the ORDERS file for audit (calc.cob:L40-L45)."
+    }
+  ],
+  "key_coverage": {
+    "R1": "full",
+    "R2": "full",
+    "R3": "full",
+    "D1": "missed"
+  },
+  "missed_items": [
+    {
+      "id": "D1",
+      "statement": "Quantity is an unsigned 3-digit number PIC 9(3)."
+    }
+  ],
+  "judge_usage": {
+    "input_tokens": 835,
+    "output_tokens": 235,
+    "cost_usd": 0.00603,
+    "calls": 1
+  },
+  "generation_usage": null,
+  "findings": [
+    {
+      "id": "F1",
+      "text": "- The unit price is a constant 12.50 (calc.cob:L6).",
+      "citations": [
+        {
+          "raw": "calc.cob:L6",
+          "resolved": "calc.cob",
+          "start": 6,
+          "end": 6,
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "judgement": {
+        "matches": [
+          {
+            "key_id": "R1",
+            "degree": "full"
+          }
+        ],
+        "verdict": "matched",
+        "note": ""
+      }
+    },
+    {
+      "id": "F2",
+      "text": "- Orders with quantity greater than 100 are refused and \"Quantity too large\" is shown (calc.cob:L10-L11).",
+      "citations": [
+        {
+          "raw": "calc.cob:L10-L11",
+          "resolved": "calc.cob",
+          "start": 10,
+          "end": 11,
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "judgement": {
+        "matches": [
+          {
+            "key_id": "R2",
+            "degree": "full"
+          }
+        ],
+        "verdict": "matched",
+        "note": ""
+      }
+    },
+    {
+      "id": "F3",
+      "text": "- A 10% discount is applied to orders above 50 units (calc.cob:L12-L13).",
+      "citations": [
+        {
+          "raw": "calc.cob:L12-L13",
+          "resolved": "calc.cob",
+          "start": 12,
+          "end": 13,
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "judgement": {
+        "matches": [],
+        "verdict": "incorrect",
+        "note": "No discount logic exists in the source; ELSE branch simply computes total."
+      }
+    },
+    {
+      "id": "F4",
+      "text": "- The order total is written to the ORDERS file for audit (calc.cob:L40-L45).",
+      "citations": [
+        {
+          "raw": "calc.cob:L40-L45",
+          "resolved": "calc.cob",
+          "start": 40,
+          "end": 45,
+          "valid": false,
+          "reason": "out of range (file has 16 lines)"
+        }
+      ],
+      "judgement": {
+        "matches": [],
+        "verdict": "incorrect",
+        "note": "No ORDERS file or audit write exists; source only displays total to screen."
+      }
+    },
+    {
+      "id": "F5",
+      "text": "- Totals are displayed after computation; see `calc.cob` lines 13-14.",
+      "citations": [
+        {
+          "raw": "calc.cob` lines 13-14",
+          "resolved": "calc.cob",
+          "start": 13,
+          "end": 14,
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "judgement": {
+        "matches": [
+          {
+            "key_id": "R3",
+            "degree": "full"
+          }
+        ],
+        "verdict": "matched",
+        "note": ""
+      }
+    },
+    {
+      "id": "F6",
+      "text": "- The program terminates with STOP RUN after one calculation (L16).",
+      "citations": [
+        {
+          "raw": "L16",
+          "resolved": "calc.cob",
+          "start": 16,
+          "end": 16,
+          "valid": true,
+          "reason": "ok"
+        }
+      ],
+      "judgement": {
+        "matches": [],
+        "verdict": "correct_extra",
+        "note": ""
+      }
+    }
+  ]
+}

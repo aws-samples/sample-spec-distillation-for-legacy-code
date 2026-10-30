@@ -1,0 +1,4 @@
+contract_registry.md
+obligation_assessment.md
+capability_map.md
+README.md

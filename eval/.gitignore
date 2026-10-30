@@ -1,0 +1,12 @@
+# Third-party corpora you evaluate against: fetch locally, do not commit.
+sources/
+__pycache__/
+.venv/
+.hypothesis/
+# Judge verdict cache: regenerable, and specific to one machine's runs.
+# judge/cache/.gitignore keeps the directory while ignoring its contents.
+# Per-machine running Bedrock log (bedrock_util.DEFAULT_LOG).
+logs/local/
+# Evaluation run outputs.
+runs/
+ci/runs/

@@ -1,0 +1,61 @@
+flowchart TB
+    subgraph L1["① Browser"]
+        direction LR
+        UI["<b>Launcher UI</b><br/><i>launcher_ui/index.html</i><br/>Run evaluation · Smoke check · cost plan · live status"]
+        VW["<b>Run viewer — Evaluation tab</b><br/><i>generate-viewer-v3.py</i><br/>Exact + Estimated scorecard"]
+    end
+
+    subgraph L2["② Launcher service"]
+        direction LR
+        API["<b>Launcher API</b> · <i>launcher_server.py</i><br/>POST /api/runs/&lt;id&gt;/eval · GET …/eval/status"]
+        VAPI["<b>Viewer API</b> · <i>viewer_api.py</i><br/>GET /api/eval → scorecard JSON"]
+    end
+
+    SUITE["<b>③ Suite runner</b> · <i>eval/ci/run_suite.py</i><br/>cost plan (--plan) · budget cap · free smoke (--smoke) · provenance · <i>suites/*.yaml</i>"]
+
+    subgraph L4["④ Evaluators"]
+        direction LR
+        GRAPH["<b>Graph validator</b><br/><i>eval/graph_eval.py</i><br/>graph vs parser facts"]
+        MUT["<b>Mutation harness</b><br/><i>eval/mutate/</i><br/>injected-defect detection"]
+        SCORE["<b>Spec scorer</b><br/><i>eval/score.py</i><br/>citations · coverage · recall"]
+        BEN["<b>Benefit evals</b><br/><i>eval/benefits/</i><br/>issues · Q&A · impact · app reqs"]
+    end
+
+    subgraph L5["⑤ LLM-as-a-judge"]
+        direction LR
+        JR["<b>Judge runner</b> · <i>eval/judge/</i><br/>JSON schema · 3-run vote · CI · κ"]
+        BR["<b>Amazon Bedrock</b><br/>Claude Opus 5.5 / Sonnet 4.6"]
+        CACHE[("Verdict cache")]
+        GOLD[("Human labels<br/><i>judge/golden</i>")]
+    end
+
+    subgraph L6["⑥ Data"]
+        direction LR
+        RUN[("<b>Pipeline output</b><br/><i>output/runs/&lt;id&gt;/</i><br/>spec · issues · graph · facts")]
+        KEYS[("<b>Answer keys</b><br/><i>synthetic-corpus · eval/keys</i>")]
+        RES[("<b>Eval results</b><br/>score.json · graph_eval.json<br/>benefits/*.json · suite.json")]
+    end
+
+    L1 -->|"http://127.0.0.1 (local only)"| L2
+    API -->|plan → confirm → launch| SUITE
+    SUITE --> L4
+    SCORE --> JR
+    BEN --> JR
+    JR --> BR
+    JR <--> CACHE
+    GOLD --> JR
+    RUN --> L4
+    KEYS -. hidden from pipeline .-> SCORE
+    L4 --> RES
+    RES --> VAPI
+
+    classDef ui fill:#eef2ff,stroke:#3f51b5,color:#1a2357;
+    classDef svc fill:#f5f7fb,stroke:#5a6b8c,color:#1d2433;
+    classDef exactc fill:#e6f4ea,stroke:#2e7d32,color:#1b3d1f;
+    classDef judgedc fill:#fff4e5,stroke:#e08a00,color:#4a2d00;
+    classDef store fill:#fafafa,stroke:#9e9e9e,color:#333;
+    class UI,VW ui;
+    class API,VAPI,SUITE svc;
+    class GRAPH,MUT exactc;
+    class SCORE,BEN,JR,BR judgedc;
+    class KEYS,GOLD,RUN,RES,CACHE store;

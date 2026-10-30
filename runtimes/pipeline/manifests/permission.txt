@@ -1,0 +1,4 @@
+role_registry.md
+capability_matrix.md
+boundary_spec.md
+README.md

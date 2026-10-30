@@ -1,0 +1,50 @@
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved. SPDX-License-Identifier: MIT-0
+
+REPORT DEFINITION EXPORT  (stand-in for AP Open Payables by Job.rpt)
+=====================================================================
+Report #      : 412
+Title         : AP Open Payables by Job
+Module        : AP
+Data source   : Command  -> Scripts\Reports\412.sql
+Last modified : PSV 04/2017
+
+PARAMETERS
+  {?APCo}         Number    AP company
+  {?AsOfDate}     Date      aging date (default CurrentDate)
+  {?Job}          String    blank = all jobs
+  {?IncludeHeld}  String    Y/N, default Y
+
+GROUPS
+  GH1  Command.Job          "Job: " + {Command.Job} + " - " + {Command.JobDescr}
+  GH2  Command.VendName
+
+DETAIL
+  APRef | InvDate | DueDate | Status | GrossAmt | RetgHeld | OpenPayable | AgeBucket | HoldList
+
+FORMULA FIELDS
+  @StatusText     Select {Command.Status}
+                    Case "P": "Pending Approval"
+                    Case "A": "Approved"
+                    Case "H": "On Hold"
+                    Default: {Command.Status}
+  @PayableNow     If {Command.PayBlocked} = "Y" or {Command.Status} <> "A"
+                  Then 0 Else {Command.OpenPayable}
+  @RetgNote       If {Command.RetgHeld} > 0 and {Command.JobStatus} >= 2
+                  Then "Retainage eligible for release"
+                  Else ""
+  @PastDueFlag    If {Command.DaysPastDue} > 0 Then "*" Else ""
+
+SUMMARIES (per GH1 and report footer)
+  Sum of GrossAmt, Sum of RetgHeld, Sum of OpenPayable, Sum of @PayableNow
+
+CONDITIONAL FORMATTING
+  Detail row red background when {Command.PayBlocked} = "Y"
+  HoldList font bold when it contains "INS"
+
+SUPPRESSION
+  GH1 suppressed when Sum of OpenPayable = 0 and Sum of RetgHeld = 0
+
+NOTES
+  "Payable Now" total is what AP uses for the weekly cash requirements
+  meeting. Pending Approval invoices are listed for visibility but never
+  counted in Payable Now.
