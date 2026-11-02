@@ -177,8 +177,9 @@ In the browser:
 Notes:
 
 - **Local only.** The launcher binds to `127.0.0.1` and refuses other addresses unless you pass
-  `--allow-non-loopback`. If you do expose it, set `DISTILL_ACCESS_CODE` to require a shared access
-  code. That is a demo-grade gate, so read [Hardening](#hardening-before-you-adapt-it) first.
+  `--allow-non-loopback`. Do not expose it to a network. The optional `DISTILL_ACCESS_CODE` is a
+  shared demo code, not authentication, and does not make an exposed launcher safe. See
+  [Hardening](#hardening-before-you-adapt-it).
 - **Where output goes.** Each run is written to `output/runs/<run-id>/`. Stop the launcher with Ctrl+C.
   Runs in progress stop with it, and you can resume them from the CLI.
 - **API.** The UI is built on a small JSON API; see [docs/LAUNCHER_API.md](docs/LAUNCHER_API.md).

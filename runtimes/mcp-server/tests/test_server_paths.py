@@ -81,3 +81,13 @@ def test_read_confined_reads_inside_and_refuses_escape(roots, tmp_path):
     (tmp_path / "secret.txt").write_text("x")
     with pytest.raises(ValueError):
         server._read_confined(str(roots / ".." / "secret.txt"))
+
+
+def test_still_name_must_be_plain(roots):
+    import tools
+    for bad in ("../x", "a/b", ".hidden", "", "x" * 65):
+        r = tools.handle_reduce_distillation(
+            {"partials_dir": str(roots), "still_prompt": "p", "still_name": bad, "output_dir": str(roots)},
+            None, None)
+        assert r.get("error"), bad
+    assert all(not tools._bad_still_name(n) for n in ("rule", "00_conventions", "cross_domain_blend"))

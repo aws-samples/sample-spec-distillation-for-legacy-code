@@ -15,6 +15,7 @@ Non-invasive: reads filesystem only, never writes. Safe to run alongside the pip
 """
 
 import argparse
+import ipaddress
 import json
 import os
 import time
@@ -635,10 +636,26 @@ setInterval(refreshPreflight,15000);
 </body></html>"""
 
 
+def _is_loopback_host(host_header: str) -> bool:
+    """True when the Host header names a loopback address (blocks DNS rebinding)."""
+    host = (host_header or "").strip().lower()
+    host = host.split("]")[0] + "]" if host.startswith("[") else (host.rsplit(":", 1)[0] if host.count(":") == 1 else host)
+    host = host.strip("[]")
+    if host in ("localhost", "localhost.localdomain", "ip6-localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
 class ProgressHandler(BaseHTTPRequestHandler):
     output_dir = ""
     
     def do_GET(self):
+        if not _is_loopback_host(self.headers.get("Host")):
+            self.send_error(403, "Forbidden host")
+            return
         path = urlparse(self.path).path
         if path == "/api/progress":
             data = get_progress(self.output_dir)
