@@ -16,6 +16,7 @@ Returns:
 """
 
 import argparse
+import ipaddress
 import json
 import os
 import sys
@@ -28,6 +29,24 @@ import threading
 sys.path.insert(0, str(Path(__file__).parent))
 
 import viewer_api  # the chat/validate/dependencies/translate logic (torch deferred inside)
+
+
+def _bare_host(host: str) -> str:
+    """Host header without its port ("[::1]:8080" -> "[::1]", "localhost:8080" -> "localhost")."""
+    host = (host or "").strip().lower()
+    if host.startswith("["):
+        return host.split("]")[0] + "]"
+    return host.rsplit(":", 1)[0] if host.count(":") == 1 else host
+
+
+def _is_loopback(host: str) -> bool:
+    h = host.strip().strip("[]").lower()
+    if h in ("localhost", "localhost.localdomain", "ip6-localhost"):
+        return True
+    try:
+        return ipaddress.ip_address(h).is_loopback
+    except ValueError:
+        return False
 
 
 class ViewerHandler(SimpleHTTPRequestHandler):
@@ -52,7 +71,26 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def _guard(self, write: bool = False) -> bool:
+        """Same protections as the launcher: only a loopback Host (blocks DNS rebinding), no
+        cross-origin callers (a page in another tab cannot drive the API), and JSON bodies only
+        for POST (a plain HTML form cannot send one without a CORS preflight, which is refused)."""
+        host = self.headers.get("Host") or ""
+        if not _is_loopback(_bare_host(host)):
+            self.send_error(403, "Forbidden host")
+            return False
+        origin = self.headers.get("Origin")
+        if origin and origin != f"http://{host}":
+            self.send_error(403, "Cross-origin requests are not allowed")
+            return False
+        if write and (self.headers.get("Content-Type") or "").split(";")[0].strip().lower() != "application/json":
+            self.send_error(415, "Content-Type must be application/json")
+            return False
+        return True
+
     def do_GET(self):
+        if not self._guard():
+            return
         if urlparse(self.path).path == "/api/eval":
             # The Evaluation page's data: the run directory is the viewer directory's parent.
             try:
@@ -69,6 +107,8 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        if not self._guard(write=True):
+            return
         if self.path == "/api/chat":
             self._handle_chat()
         elif self.path == "/api/validate":
@@ -81,10 +121,8 @@ class ViewerHandler(SimpleHTTPRequestHandler):
             self.send_error(404)
 
     def do_OPTIONS(self):
-        """Handle CORS preflight."""
-        self.send_response(200)
-        self._cors_headers()
-        self.end_headers()
+        """Refuse CORS preflights: the API is for the viewer's own origin only."""
+        self.send_error(403, "Cross-origin requests are not allowed")
 
     def _handle_chat(self):
         content_length = int(self.headers.get("Content-Length", 0))
@@ -108,11 +146,6 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         # cause (expired credentials, no Bedrock access, missing vector store) into {"error": ...}.
         result = viewer_api.chat(self.vector_db_path, question, top_k)
         self._json_response(result)
-
-    def _cors_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def _handle_validate(self):
         """Validate a block against its source evidence, or (when source is
@@ -183,7 +216,7 @@ class ViewerHandler(SimpleHTTPRequestHandler):
         response = json.dumps(data).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self._cors_headers()
+        self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Content-Length", str(len(response)))
         self.end_headers()
         self.wfile.write(response)

@@ -111,7 +111,8 @@ def validate(vector_db_path: str, source_root: str, repo_url: str,
     not-found rather than read.
     """
     block_text = block
-    evidence_str = evidence
+    # Evidence is a short list of "path#Lx-Ly" references; capping it bounds the regex work below.
+    evidence_str = (evidence or "")[:4000]
 
     if not block_text or not evidence_str:
         return {"error": "Missing 'block' or 'evidence' field"}

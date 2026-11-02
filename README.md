@@ -71,8 +71,9 @@ uses Claude Haiku 4.5 (`DISTILL_CODE_GRAPH_MODEL`). Embeddings run locally with
 More detail: [docs/RUN_GUIDE.md](docs/RUN_GUIDE.md) (inputs, steps, outputs),
 [docs/RUNBOOK.md](docs/RUNBOOK.md) (every knob, checkpoints, exit codes),
 [docs/LAUNCHER_API.md](docs/LAUNCHER_API.md) (local launcher API),
-[docs/EVAL_ARCHITECTURE.md](docs/EVAL_ARCHITECTURE.md) (how the output is evaluated), and
-[docs/PRODUCTION_ARCHITECTURE.md](docs/PRODUCTION_ARCHITECTURE.md) (an illustrative production shape).
+[docs/EVAL_ARCHITECTURE.md](docs/EVAL_ARCHITECTURE.md) (how the output is evaluated),
+[docs/PRODUCTION_ARCHITECTURE.md](docs/PRODUCTION_ARCHITECTURE.md) (an illustrative production shape), and
+[docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) (threats and mitigations).
 
 ## Prerequisites
 
@@ -176,8 +177,9 @@ In the browser:
 Notes:
 
 - **Local only.** The launcher binds to `127.0.0.1` and refuses other addresses unless you pass
-  `--allow-non-loopback`. If you do expose it, set `DISTILL_ACCESS_CODE` to require a shared access
-  code. That is a demo-grade gate, so read [Hardening](#hardening-before-you-adapt-it) first.
+  `--allow-non-loopback`. Do not expose it to a network. The optional `DISTILL_ACCESS_CODE` is a
+  shared demo code, not authentication, and does not make an exposed launcher safe. See
+  [Hardening](#hardening-before-you-adapt-it).
 - **Where output goes.** Each run is written to `output/runs/<run-id>/`. Stop the launcher with Ctrl+C.
   Runs in progress stop with it, and you can resume them from the CLI.
 - **API.** The UI is built on a small JSON API; see [docs/LAUNCHER_API.md](docs/LAUNCHER_API.md).
@@ -260,6 +262,9 @@ This is sample code. Before you use it beyond a single trusted machine, at least
 - **Keep the servers local.** `launcher_server.py`, `serve_viewer.py` and `progress_server.py` bind to
   loopback, and the launcher refuses a non-loopback `--host` unless you pass `--allow-non-loopback`.
   Do not put them on a public network. They start paid Bedrock runs and read local files.
+- **Confine MCP tool paths.** The `bedrock-distill` MCP server only accepts file and directory
+  arguments inside this repository, `DISTILL_TARGET`, `DISTILL_OUTPUT` and any directories in
+  `DISTILL_MCP_ALLOWED_ROOTS` (separated by `:`). Keep that list as narrow as your runs allow.
 - **Replace the shared access code.** `DISTILL_ACCESS_CODE` is one shared secret with in-memory
   sessions: no per-user identity, authorization, audit trail, rate limiting or lockout. A real
   deployment needs per-user authentication (for example Amazon Cognito or IAM Identity Center behind

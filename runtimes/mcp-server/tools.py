@@ -5,6 +5,7 @@ Each handler validates input, delegates to jobs.py, and returns metadata-only re
 NEVER includes extraction content in responses.
 """
 
+import re
 import time
 from pathlib import Path
 
@@ -15,6 +16,15 @@ import still_registry
 
 
 # ── Error Helpers ────────────────────────────────────────────────────────────
+
+
+# Still names become path components (<still>/page_NNN/<still>_extract.md), so only plain names
+# are accepted: letters, digits, "_" and "-", starting with a letter or digit.
+_STILL_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+
+
+def _bad_still_name(name) -> bool:
+    return not isinstance(name, str) or not _STILL_NAME_RE.match(name.strip())
 
 
 def _error(message: str) -> dict:
@@ -65,6 +75,8 @@ def handle_submit_distillation(
     if not still_name or not str(still_name).strip():
         return _error("'still_name' must be a non-empty string")
     still_name = str(still_name).strip()
+    if _bad_still_name(still_name):
+        return _error("'still_name' must contain only letters, digits, '_' and '-'")
 
     # ── Validate mode ────────────────────────────────────────────────────
     # Realtime is the only supported economy. Bedrock batch inference was culled
@@ -498,6 +510,9 @@ def handle_reduce_distillation(
     still_name = params.get("still_name", "")
     if not still_name:
         return _error("'still_name' must be a non-empty string")
+    if _bad_still_name(still_name):
+        return _error("'still_name' must contain only letters, digits, '_' and '-'")
+    still_name = still_name.strip()
 
     output_dir = params.get("output_dir", "")
     if not output_dir:
