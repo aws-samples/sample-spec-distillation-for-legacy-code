@@ -23,7 +23,7 @@ MARKED_URL = "https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
 
 _HREF = re.compile(r'(\bhref=)"([^"]*)"', re.I)
 _SAFE_TARGET = re.compile(r"^(?:https?:|mailto:|#|/|\.{1,2}/|[^:]*$)", re.I)
-_INLINE_SCRIPT = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script>", re.I | re.S)
+_INLINE_SCRIPT = re.compile(r"<script(?![^>]*\bsrc\s*=)[^>]*>(.*?)</script\s*>", re.I | re.S)
 _HANDLER = re.compile(r'\bon[a-z]+="([^"]*)"', re.I)
 _CSP_META = re.compile(r'<meta http-equiv="Content-Security-Policy"[^>]*>\s*', re.I)
 
