@@ -86,6 +86,15 @@ ACCESS_UI_FILE = HERE / "launcher_ui" / "access.html"
 # serves it for every run (so older and read-only imported viewers get it), with its API base set.
 EVAL_PAGE_TEMPLATE = HERE.parent / "pipeline" / "viewer_evaluation.html"
 EVAL_PAGE_REL = "viewer/pages/evaluation.html"
+
+
+def _viewer_security():
+    """runtimes/pipeline/viewer_security.py: the same link and CSP hardening the generator applies."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("viewer_security", HERE.parent / "pipeline" / "viewer_security.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 EXIT_BUDGET = 6
 
 # Stills run_distillation.sh skips when auto-discovering (meta / synthesis stills).
@@ -1166,7 +1175,8 @@ class Launcher:
         read-only imported runs), so their Evaluation tab works without regenerating anything."""
         self.get(run_id)                                       # 404 for an unknown run
         html = EVAL_PAGE_TEMPLATE.read_text(encoding="utf-8")
-        return html.replace('"__EVAL_API_BASE__"', json.dumps(f"/api/runs/{run_id}")).encode("utf-8")
+        html = html.replace('"__EVAL_API_BASE__"', json.dumps(f"/api/runs/{run_id}"))
+        return _viewer_security().harden(html).encode("utf-8")
 
     @staticmethod
     def viewer_index(p: Path) -> bytes:

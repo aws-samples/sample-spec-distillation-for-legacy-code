@@ -33,6 +33,9 @@ import time
 from pathlib import Path
 from typing import Optional
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import viewer_security  # noqa: E402
+
 try:
     import markdown
     from markdown.extensions.tables import TableExtension
@@ -2099,7 +2102,8 @@ else{chatToggle.style.display='';chatDock.innerHTML='&#x2B12;';chatDock.title='D
 chatToggle.onclick=toggleChat;chatDock.onclick=dockChat;
 
 function escH(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function mdSafe(s){const e=escH(s);return typeof marked!=='undefined'?marked.parse(e):e.replace(/\\n/g,'<br>')}
+function safeLinks(h){const t=document.createElement('template');t.innerHTML=h;t.content.querySelectorAll('[href]').forEach(a=>{const u=(a.getAttribute('href')||'').replace(/[\\x00-\\x20]/g,'');if(!/^(https?:|mailto:|#|\\/|\\.{1,2}\\/|[^:]*$)/i.test(u))a.setAttribute('href','#')});return t.innerHTML}
+function mdSafe(s){const e=escH(s);return safeLinks(typeof marked!=='undefined'?marked.parse(e):e.replace(/\\n/g,'<br>'))}
 async function sendChat(){const q=chatInput.value.trim();if(!q)return;
 chatInput.value='';chatSend.disabled=true;
 chatMessages.innerHTML+='<div style="margin-bottom:12px;padding:8px 12px;border-radius:8px;background:#edf2f7;color:#2d3748">'+escH(q)+'</div>';chatMessages.scrollTop=chatMessages.scrollHeight;
@@ -2370,6 +2374,10 @@ def generate_viewer(base_dir: Path, target_name: str, output_dir: Path,
         has_bottled=has_bottled,
         api_base=api_base,
     )
+
+    # ── Hardening: safe links and a per-file Content Security Policy (viewer_security.py) ──
+    for html_file in output_dir.rglob("*.html"):
+        html_file.write_text(viewer_security.harden(html_file.read_text(encoding="utf-8")), encoding="utf-8")
 
     # Summary
     total_size = sum(f.stat().st_size for f in output_dir.rglob("*") if f.is_file())
