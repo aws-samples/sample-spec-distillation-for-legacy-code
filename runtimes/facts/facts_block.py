@@ -20,6 +20,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from facts_post import clr, unit_prefix  # the merged VB.NET + C# view; one definition, see facts_post
+from treesitter_facts import SECTIONS as TS_SECTIONS  # py / java / js (Tree-sitter)
 
 HEADER = (
     "STRUCTURAL FACTS FOR FILES ON THIS PAGE (deterministic parser output: Roslyn for VB.NET and "
@@ -30,6 +31,8 @@ HEADER = (
     "it. Cite the source lines (file:Lx-Ly), not this block. Locations on other pages are given "
     "so you can name cross-file relationships; do not invent their content."
 )
+# Said only when Tree-sitter facts are present, so a .NET-only block (and its hash) is unchanged.
+TS_HEADER_NOTE = " Python, Java and JavaScript/TypeScript facts come from Tree-sitter."
 
 # Section order = priority order (highest-value, lowest-volume first).
 SECTIONS = (
@@ -38,6 +41,7 @@ SECTIONS = (
     ("data", "Stored procedures, tables and triggers"),
     ("duplicates", "Repeated logic (CANDIDATE)"),
     ("calls", "Cross-file calls"),
+    ("imports", "Imports and SQL in string literals"),
 )
 
 
@@ -257,6 +261,9 @@ def _duplicates(f: dict, pg: _Page, nm: _Names) -> list[str]:
 
 def _calls(f: dict, pg: _Page, nm: _Names) -> list[str]:
     vb, d = clr(f), f.get("derived", {})
+    for sect in TS_SECTIONS:                      # same method/call shapes as the CLR sections
+        for k in ("methods", "calls"):
+            vb[k] = vb[k] + list((f.get(sect) or {}).get(k) or [])
     methods = {m["id"]: m for m in vb.get("methods", [])}
     out_by: dict[str, list[str]] = defaultdict(list)
     in_by: dict[str, list[str]] = defaultdict(list)
@@ -282,8 +289,34 @@ def _calls(f: dict, pg: _Page, nm: _Names) -> list[str]:
     return out
 
 
+def _imports(f: dict, pg: _Page, nm: _Names) -> list[str]:
+    """Tree-sitter languages: what each file on the page imports, and the tables its SQL strings
+    read and write (the CLR equivalents are in the data section)."""
+    out = []
+    for sect in TS_SECTIONS:
+        s = f.get(sect) or {}
+        by_file: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
+        for i in s.get("imports") or []:
+            if not pg.has(i["file"], i["line"]):
+                continue
+            if i.get("resolved_file"):
+                by_file[i["file"]]["internal"].append(f"{i['module']} [{nm.f(i['resolved_file'])}]")
+            else:
+                by_file[i["file"]]["stdlib" if i.get("stdlib") else "external"].append(i["module"])
+        for file in sorted(by_file):
+            parts = [f"{k}: " + ", ".join(dict.fromkeys(v)) for k, v in sorted(by_file[file].items())]
+            out.append(f"{nm.f(file)} imports " + "; ".join(parts))
+        for q in s.get("inline_sql") or []:
+            if not pg.has(q["file"], q["line"]):
+                continue
+            acc = [f"reads {r['table']}" for r in q.get("reads") or []]
+            acc += [f"{w['op']}s {w['table']}" for w in q.get("writes") or []]
+            out.append(f"SQL string [{nm.cite(q['file'], q['line'])}] " + ", ".join(acc))
+    return out
+
+
 _BUILDERS = {"cross_layer": _cross_layer, "constants": _constants, "data": _data,
-             "duplicates": _duplicates, "calls": _calls}
+             "duplicates": _duplicates, "calls": _calls, "imports": _imports}
 
 
 def render_page_block(facts: dict, units: dict[str, list[tuple[int, int]]], max_chars: int) -> str:
@@ -292,8 +325,9 @@ def render_page_block(facts: dict, units: dict[str, list[tuple[int, int]]], max_
         return ""
     pg = _Page(units)
     nm = _Names([x["file"] for x in facts.get("files", [])])
-    out = [HEADER]
-    used = len(HEADER)
+    header = HEADER + (TS_HEADER_NOTE if any(facts.get(s) for s in TS_SECTIONS) else "")
+    out = [header]
+    used = len(header)
     any_item = False
     for key, title in SECTIONS:
         items = _BUILDERS[key](facts, pg, nm)

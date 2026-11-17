@@ -19,7 +19,7 @@ Design (validated in experiments/dep-graph-poc):
     tokens are preserved as `unverified_tag` (never discarded).
   - Provenance: model id + timestamp + page stamped on every file.
   - Deterministic parser preferred: where <run>/facts/facts.json exists (Roslyn VB.NET + C#,
-    ScriptDom T-SQL — runtimes/facts), a model-proposed relation the parser also has is confirmed
+    ScriptDom T-SQL, Tree-sitter Python — runtimes/facts), a model-proposed relation the parser also has is confirmed
     outright and the parser's operation/direction win; a relation the parser found and the model
     missed is BACKFILLED, tagged `facts:*` in code_edges.symbol so the model-proposed and
     parser-backed populations stay separable. See FactsIndex.
@@ -30,6 +30,8 @@ whole-language blind spot cannot hide behind an "it is a different shape" story)
     vbnet   method->method calls, proc EXEC (SqlCommand/CommandText/proc literal), table
             reads/writes (inline SQL and via a DAL), trigger/report references, Imports
     csharp  the same as vbnet, in C# spelling
+    python  function/method calls, imports (incl. external libraries), table reads/writes from SQL
+            strings and ORM usage; same JSON shape as C#/VB, so the CLR branch handles it
     cobol   CALL/COPY/file access
 
 Cost (Haiku 4.5): output-dominated (output priced ~5x input),
@@ -64,7 +66,7 @@ PRICE_IN, PRICE_OUT = 1.0, 5.0  # $/M tokens (Haiku 4.5 US)
 MAX_ERROR_RATE = float(os.environ.get("DISTILL_CODE_GRAPH_MAX_ERROR_RATE", "0.2"))
 
 CODE_EXTS = {"sql": "sql", "cs": "csharp", "vb": "vbnet",
-             "cob": "cobol", "cbl": "cobol", "cpy": "cobol"}  # reasonable SEED, not a finish line;
+             "cob": "cobol", "cbl": "cobol", "cpy": "cobol", "py": "python"}  # reasonable SEED, not a finish line;
 # untapped languages are surfaced by preflight + a path-to-cover reasoned by the rectifier
 # (raw-extractable → new _LANG_PROMPTS template; needs intermediary → ingest-helper spec).
 # See spec L-coverage-doctrine + code-graph-arbitration X-cga-B2/B3.
@@ -309,9 +311,69 @@ Source:
 ```
 Output ONLY the JSON object."""
 
+PY_SYSTEM = ("You are a precise Python analyst. You trace, for every file, who it CALLS, which modules "
+             "and external libraries it IMPORTS and which database tables it READS and WRITES — "
+             "including SQL in string literals and access through an ORM or a repository. You also "
+             "decode abbreviated identifiers. Output ONLY one JSON object, no prose, no fences.")
+PY_USER = """Analyze this Python file: {path}
+
+Emit JSON:
+"file_role": "controller"|"service"|"repository"|"entity"|"dto"|"test"|"config"|"utility"|"cli"|"other"
+"module": the source system's short business-area/module code if clearly inferable, else null
+"business_intent": ONE short sentence
+"usings": [imported module strings, as written: `import x.y` -> "x.y", `from a.b import c` -> "a.b",
+    a relative `from .models import X` -> ".models"]   (standard library AND third-party AND local)
+"declarations": [{{"name":"Class or top-level function","kind":"class"|"function"|"dataclass"|"enum",
+    "base":"<first base class or null>","implements":[other base classes / mixins]}}]
+"calls": [{{"caller":"<enclosing function or Class.method, or null at module level>",
+    "callee":"<function or method name, qualified Class.method when the receiver's class is known>",
+    "receiver":"<the receiver expression as written, or null for a plain call>","confidence":<0.0-1.0>}}]
+"data_refs": [{{"name":"<table / view / stored procedure / ORM model's table, VERBATIM from the source>",
+    "kind":"table"|"view"|"stored_procedure"|"function",
+    "operation":"select"|"insert"|"update"|"delete"|"merge"|"join"|"exec"|"unknown",
+    "direction":"read"|"write"|"call",
+    "via":"inline_sql"|"orm"|"dal"|"proc_literal"|"other",
+    "resolution":"static"|"dynamic_sql","confidence":<0.0-1.0>}}]
+"references": [{{"symbol":"module.Name","kind":"type"|"call"|"instantiate"|"inherit"|"decorator",
+    "resolution":"local"|"remote"|"builtin","gateway":"<imported module or null>","confidence":<0.0-1.0>}}]
+"business_entities": [{{"code_name":"...","business_name":"...","confidence":<0.0-1.0>}}]
+
+How to find each relation:
+- calls: every call of a function, method or class (constructor) defined in THIS system — `foo()`,
+  `self.foo()`, `cls.foo()`, `obj.foo()`, `module.foo()`, `Order(...)`. Qualify with the class when
+  the receiver's class is visible (`self`, an annotation, `x = Repo()`, a `self.repo = Repo()` in
+  `__init__`). SKIP builtins and library members (print/len/str/dict.get/list.append/logging...).
+- imports: every `import` and `from ... import` — these are the IMPORTS edges, including the
+  external libraries (requests, sqlalchemy, flask, django, ...) the business logic depends on.
+- tables: every table or view named in SQL text in this file (a literal, an f-string, a
+  concatenation, a `cursor.execute(...)` / `text(...)` argument), and an ORM model whose table is
+  stated in this file (`__tablename__ = "orders"`, `db_table`, `Table("orders", ...)`), or a query
+  on such a model (`session.query(Order)`, `Order.objects.filter(...)`, `session.add(order)`):
+  operation = the SQL verb / ORM action; direction read for select/get/filter/join, write for
+  insert/add/save/update/delete/merge.
+- tables via a repository: when the called data-access method's own name names the table, emit it
+  with via "dal" and confidence <= 0.6. Never invent a table that is nowhere named in this file.
+- stored procedures: `callproc("x")`, `EXEC x` in a SQL string -> kind "stored_procedure", "exec", "call".
+- SQL assembled at runtime -> resolution "dynamic_sql"; never guess the assembled part.
+
+TWO THINGS NOT TO DO (both are checked, and both cost precision):
+- A function or method of THIS system is a CALL, not a stored procedure or a table.
+- A name that appears only in a COMMENT or a docstring is not a dependency of this file.
+
+Rules: one entry per DISTINCT relation; every `name` in data_refs and every `callee` in calls MUST
+appear verbatim in the source below (a deterministic checker verifies this); gateway MUST be one of
+the usings or null.
+
+Source:
+```python
+{source}
+```
+Output ONLY the JSON object."""
+
 # lang → (system, user) prompt. Default (unknown lang) uses the C# template (closest general shape).
 _LANG_PROMPTS = {"sql": (SQL_SYSTEM, SQL_USER), "csharp": (CS_SYSTEM, CS_USER),
-                 "vbnet": (VB_SYSTEM, VB_USER), "cobol": (COBOL_SYSTEM, COBOL_USER)}
+                 "vbnet": (VB_SYSTEM, VB_USER), "cobol": (COBOL_SYSTEM, COBOL_USER),
+                 "python": (PY_SYSTEM, PY_USER)}
 
 
 # ── SQLite schema ────────────────────────────────────────────────────────────
@@ -601,7 +663,8 @@ def _confirms_write(bare: str, source_lower: str) -> bool:
 
 
 # ── Deterministic parser facts (runtimes/facts) — preferred over the model ────
-# build_facts.py writes <run>/facts/facts.json with Roslyn (VB.NET, C#) + ScriptDom (T-SQL) output.
+# build_facts.py writes <run>/facts/facts.json with Roslyn (VB.NET, C#) + ScriptDom (T-SQL) output,
+# plus Tree-sitter sections (py / java / js: runtimes/facts/treesitter_facts.py) in the same shapes.
 # Where it exists it is GROUND TRUTH for the relations it models, so this pass uses it two ways:
 #   CORROBORATE  a model-proposed edge the parser also has is `confirmed` outright, and a direction
 #                or relation the parser contradicts is RELABELLED (model proposes, parser disposes).
@@ -610,6 +673,8 @@ def _confirms_write(bare: str, source_lower: str) -> bool:
 # Nothing here needs the LLM, so a facts-backed run degrades gracefully to model-only when absent.
 
 FACTS_PROVENANCE = "facts:"          # prefix written into code_edges.symbol for backfilled edges
+CLR_FACT_SECTIONS = ("vb", "cs")
+TS_FACT_SECTIONS = ("py", "java", "js")   # Tree-sitter: also imports and code objects
 _OP_DIRECTION = {"select": "read", "join": "read", "insert": "write", "update": "write",
                  "delete": "write", "merge": "write", "select into": "write", "exec": "call"}
 
@@ -631,6 +696,8 @@ class FactsIndex:
         self.proc_names: set[str] = set()
         self.method_names: set[str] = set()
         self.table_names: set[str] = set()
+        # file -> classes/functions/methods the parser found (Tree-sitter sections), for code_objects
+        self.objects: dict[str, list[dict]] = defaultdict(list)
         if not facts:
             return
         sql = facts.get("sql") or {}
@@ -640,7 +707,7 @@ class FactsIndex:
         for t in sql.get("tables") or []:
             if t.get("name"):
                 self.table_names.add(_normalize_dst(t["name"]))
-        for sect in ("vb", "cs"):
+        for sect in CLR_FACT_SECTIONS + TS_FACT_SECTIONS:
             for m in (facts.get(sect) or {}).get("methods") or []:
                 for key in ("name", "id"):
                     if m.get(key):
@@ -651,7 +718,7 @@ class FactsIndex:
                 self._add(t["file"], t["table"], "trigger", "trigger_on_table", "write",
                           "sql_trigger")
         # CLR sections: method calls, stored-procedure references, inline-SQL table access
-        for sect in ("vb", "cs"):
+        for sect in CLR_FACT_SECTIONS + TS_FACT_SECTIONS:
             s = facts.get(sect) or {}
             for c in s.get("calls") or []:
                 if c.get("file") and c.get("to"):
@@ -662,6 +729,23 @@ class FactsIndex:
                               f"{sect}_proc_ref")
             for q in s.get("inline_sql") or []:
                 self._add_access(q.get("file"), q, f"{sect}_inline_sql")
+        # Tree-sitter sections: imports (an external library is tagged as such) and code objects
+        for sect in TS_FACT_SECTIONS:
+            s = facts.get(sect) or {}
+            for i in s.get("imports") or []:
+                if i.get("file") and i.get("module"):
+                    tag = f"{sect}_import" + ("_stdlib" if i.get("stdlib") else
+                                              "_external" if i.get("external") else "")
+                    self._add(i["file"], i["module"], "import", "import", None, tag)
+            for t in s.get("types") or []:
+                if t.get("file") and t.get("name"):
+                    self.objects[t["file"]].append({"name": t["name"], "kind": t.get("kind") or "class",
+                                                    "source": f"facts:{sect}"})
+            for m in s.get("methods") or []:
+                if m.get("file") and m.get("name"):
+                    name = f"{m['class']}.{m['name']}" if m.get("class") else m["name"]
+                    self.objects[m["file"]].append({"name": name, "kind": (m.get("kind") or "method").lower(),
+                                                    "source": f"facts:{sect}"})
         # SQL bodies: the procs/triggers/scripts own reads, writes and EXECs
         for group, tag in (("procs", "sql_proc"), ("triggers", "sql_trigger"),
                            ("scripts", "sql_script")):
@@ -714,6 +798,9 @@ class FactsIndex:
                     return e
         return cands[0]
 
+    def objects_for(self, path: str) -> list[dict]:
+        return self.objects.get(path, [])
+
     def knows_file(self, path: str) -> bool:
         return path in self.edges or path in self.trigger_table
 
@@ -732,6 +819,8 @@ def _kind_class(kind) -> str:
         return "method"
     if k == "trigger":
         return "trigger"
+    if k == "import":
+        return "import"
     return k
 
 
@@ -752,8 +841,13 @@ def load_facts(pages_dir: Path, facts_path: str | None = None) -> tuple[dict | N
 # Mid-line comment openers per language. A WHOLE-LINE opener (VB `REM`) is handled separately,
 # because "rem " also occurs inside code (`Dim rem As Integer`, `Trem (x)`) and matching it anywhere
 # would strip real code — and stripping real code is the one way this helper can do harm.
-_LINE_COMMENT = {"vbnet": ("'",), "csharp": ("//",), "sql": ("--",), "cobol": ("*>",)}
+_LINE_COMMENT = {"vbnet": ("'",), "csharp": ("//",), "sql": ("--",), "cobol": ("*>",),
+                 "python": ("#",)}
 _WHOLE_LINE_COMMENT = {"vbnet": ("rem",), "cobol": ("*",)}
+# String delimiters the scanner respects. Python's single-quoted strings must be skipped too, or a
+# `#` inside '...' would strip code; the other languages keep the double quote only (unchanged).
+_QUOTES = {"python": ('"', "'")}
+_BACKSLASH_ESCAPES = {"python"}
 
 
 def strip_comments(body: str, lang: str) -> str:
@@ -767,27 +861,33 @@ def strip_comments(body: str, lang: str) -> str:
     """
     starts = _LINE_COMMENT.get(lang, ("//", "--"))
     whole = _WHOLE_LINE_COMMENT.get(lang, ())
+    quotes = _QUOTES.get(lang, ('"',))
+    backslash = lang in _BACKSLASH_ESCAPES
     out: list[str] = []
     for raw in (body or "").splitlines():
         head = raw.lstrip().lower()
         if any(head == w or head.startswith(w + " ") or head.startswith(w + "\t") for w in whole):
             out.append("")
             continue
-        line, i, in_str, n = [], 0, False, len(raw)
+        line, i, in_str, n = [], 0, "", len(raw)
         while i < n:
             ch = raw[i]
             if in_str:
-                if ch == '"':
-                    if raw[i + 1:i + 2] == '"':           # VB/SQL doubled-quote escape
-                        line.append('""')
+                if backslash and ch == "\\":
+                    line.append(raw[i:i + 2])
+                    i += 2
+                    continue
+                if ch == in_str:
+                    if raw[i + 1:i + 2] == in_str:        # VB/SQL doubled-quote escape
+                        line.append(in_str * 2)
                         i += 2
                         continue
-                    in_str = False
+                    in_str = ""
                 line.append(ch)
                 i += 1
                 continue
-            if ch == '"':
-                in_str = True
+            if ch in quotes:
+                in_str = ch
                 line.append(ch)
                 i += 1
                 continue
@@ -946,6 +1046,13 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
                  "page": page},
         "edges": [],
     }
+    # Tree-sitter languages: classes / functions / methods the parser found and the model did not
+    # declare become code objects too (tagged with their source; the CLR/SQL sections add none).
+    known = {_norm(d.get("name")) for d in defines}
+    for o in facts.objects_for(path):
+        if _norm(o["name"]) not in known:
+            known.add(_norm(o["name"]))
+            defines.append(dict(o))
 
     if lang == "sql":
         self_bare = {_norm(d.get("name")).split(".")[-1] for d in defines}
@@ -1007,6 +1114,14 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
         # occurrence regex and the deterministic parser facts dispose.
         for u in llm.get("usings", []):
             if not _norm(u):
+                continue
+            # an import the parser also found (Tree-sitter sections only) is confirmed outright
+            hit = (facts.find(path, _normalize_dst(u), "import")
+                   or facts.find(path, _normalize_dst(_norm(u).rpartition(".")[0]), "import"))
+            if hit:
+                node["edges"].append(_mk_edge(
+                    path, _norm(u), "IMPORTS", lang, "confirmed", kind="import", operation="import",
+                    resolution="static", direction_verdict="parser_confirmed"))
                 continue
             verdict = "confirmed" if _present(u, source_lower) else "unconfirmed"
             node["edges"].append(_mk_edge(
@@ -1106,7 +1221,7 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
     have = {(e["type"], _normalize_dst(e["dst"]), _kind_class(e.get("kind")), e.get("direction"))
             for e in node["edges"]}
     for fe in facts.for_file(path):
-        etype = {"method": "CALLS", "trigger": "TRIGGERS"}.get(fe["kind"], "REFERENCES")
+        etype = {"method": "CALLS", "trigger": "TRIGGERS", "import": "IMPORTS"}.get(fe["kind"], "REFERENCES")
         key = (etype, fe["bare"], _kind_class(fe["kind"]), fe["direction"])
         if key in have:
             continue

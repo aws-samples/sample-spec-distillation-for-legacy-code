@@ -29,7 +29,8 @@
 #   DISTILL_PAGE_TOKENS     — estimated tokens per page (chars/2, as concat-batch.sh counts them;
 #                             default: 22000, roughly 600-900 numbered source lines per page).
 #                             DISTILL_TOKEN_BUDGET is the older name for the same knob.
-#   DISTILL_FACTS           — Phase 1.2 structural facts (.NET Roslyn/ScriptDom tool) appended to
+#   DISTILL_FACTS           — Phase 1.2 structural facts (.NET Roslyn/ScriptDom tool; Tree-sitter for
+#                             Python/Java/JS/TS, DISTILL_FACTS_TREESITTER=0 turns that half off) appended to
 #                             each page in the map prompt (default: 1; 0 disables). Without dotnet
 #                             the phase logs a WARNING and the run continues without facts.
 #   DISTILL_FACTS_MAX_FRACTION — facts block bound as a fraction of the page budget (default 0.15)
@@ -604,12 +605,15 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 # runtimes/facts: a .NET 8 tool (Roslyn for VB.NET, ScriptDom for T-SQL) parses the enumerated
 # source into facts.json (methods, calls, VB->proc calls, proc->table reads/writes, constants,
-# comments); facts_post.py adds cross-layer comparison and duplicate-logic candidates. One bounded,
+# comments); treesitter_facts.py adds Python / Java / JavaScript / TypeScript (Tree-sitter wheels, no
+# SDK: classes, functions, imports, resolved calls, SQL in string literals) and runs without dotnet;
+# facts_post.py adds cross-layer comparison and duplicate-logic candidates. One bounded,
 # line-cited block per page goes to ${FACTS_DIR}/pages/page_NNN.md, and the page-centric map
 # appends it to that page. Runs after the conservation + pre-spend gates (so it chains from the
 # stamped pages token) and before the identity gate, which records the blocks' hash (facts_hash):
 # turning facts on/off or any facts change re-maps every still.
-# Facts are an enhancement: no dotnet / build failure / parse failure → WARNING, continue without.
+# Facts are an enhancement: no dotnet / build failure / parse failure → WARNING, continue without
+# (or with the Tree-sitter facts only, when the corpus has files in those languages).
 FACTS_DIR="${OUTPUT}/facts"
 FACTS_PY="${SCRIPT_DIR}/runtimes/facts/build_facts.py"
 FACTS_PAGES_DIR=""
@@ -622,18 +626,24 @@ elif [[ ! -f "${FACTS_PY}" ]]; then
 else
   HAVE_DOTNET=0
   { [[ -n "${DISTILL_FACTS_CMD:-}" ]] || command -v dotnet &>/dev/null; } && HAVE_DOTNET=1
+  # Tree-sitter grammars installed in this interpreter (part of the stage identity: installing them
+  # later must rebuild the facts)
+  HAVE_TREESITTER=$("${PYTHON}" -c 'import sys; sys.path.insert(0, sys.argv[1]); import treesitter_facts as t; print(",".join(sorted(t.tool_versions().values())) or "none")' \
+    "${SCRIPT_DIR}/runtimes/facts" 2>/dev/null || echo none)
   FACTS_ID=$(stage_id --upstream "$(stage_token pages)" \
     --code "${FACTS_PY}" "${SCRIPT_DIR}/runtimes/facts/facts_block.py" "${SCRIPT_DIR}/runtimes/facts/facts_post.py" \
+           "${SCRIPT_DIR}/runtimes/facts/treesitter_facts.py" \
            "${SCRIPT_DIR}/runtimes/facts/structure/Program.cs" "${SCRIPT_DIR}/runtimes/facts/structure/LeanStructure.csproj" \
     --config "page_budget=${TOKEN_BUDGET}" "max_fraction=${DISTILL_FACTS_MAX_FRACTION:-0.15}" \
-             "tool_available=${HAVE_DOTNET}" "tool_cmd=${DISTILL_FACTS_CMD:-}")
+             "tool_available=${HAVE_DOTNET}" "tool_cmd=${DISTILL_FACTS_CMD:-}" \
+             "treesitter=${DISTILL_FACTS_TREESITTER:-1}" "treesitter_grammars=${HAVE_TREESITTER}")
   if stage_fresh facts "${FACTS_ID}" && [[ -f "${FACTS_DIR}/facts_status.json" ]]; then
     log "Phase 1.2: Reusing structural facts (pages + facts code unchanged)."
   else
     [[ -d "${FACTS_DIR}" ]] && backup "${FACTS_DIR}" "stale_facts"
     log "Phase 1.2: Building structural facts → ${FACTS_DIR}"
     if [[ "${HAVE_DOTNET}" == "0" ]]; then
-      log "Phase 1.2: WARNING dotnet not found (setup.sh installs dotnet-sdk-8.0) — continuing WITHOUT structural facts."
+      log "Phase 1.2: WARNING dotnet not found (setup.sh installs dotnet-sdk-8.0) — no VB.NET/C#/T-SQL facts; Tree-sitter languages are still parsed (grammars: ${HAVE_TREESITTER})."
     fi
     if "${PYTHON}" "${FACTS_PY}" build --source-root "${SOURCE}" --manifest "${PAGE_MANIFEST}" \
          --pages "${PAGES_DIR}" --out "${FACTS_DIR}" --page-budget "${TOKEN_BUDGET}" \

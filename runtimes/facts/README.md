@@ -2,7 +2,7 @@
 # `runtimes/facts` — the deterministic parser layer
 
 Everything here runs **without an LLM**. It parses the enumerated source with real compiler
-front-ends and emits structural facts that carry `file` plus `start`/`end` (1-based, inclusive) or
+front-ends (Roslyn, ScriptDom) and Tree-sitter grammars and emits structural facts that carry `file` plus `start`/`end` (1-based, inclusive) or
 `line`, so every downstream claim can be cited back to a source line.
 
 Two things consume it:
@@ -15,7 +15,8 @@ Two things consume it:
    `runtimes/mcp-server/code_graph.py` uses to corroborate and backfill its own edges.
 
 ```
-build_facts.py                 Phase 1.2 driver: stage source -> run the tool -> enrich -> page blocks
+build_facts.py                 Phase 1.2 driver: stage source -> run the tool(s) -> enrich -> page blocks
+treesitter_facts.py            Tree-sitter (pip wheels, no SDK): Python, Java, JavaScript/TypeScript
 structure/Program.cs           the tool: Roslyn (VB.NET, C#) + ScriptDom (T-SQL) -> raw facts.json
 structure/LeanStructure.csproj .NET 8, Microsoft.CodeAnalysis.{VisualBasic,CSharp} + TransactSql.ScriptDom
 structure/Dockerfile           build/run the tool without a local .NET SDK
@@ -35,6 +36,9 @@ tests/                         pytest coverage; fixtures/cs-sample is the C# fix
 | **T-SQL** | `.sql` | `Microsoft.SqlServer.TransactSql.ScriptDom` 161 (`TSql160Parser`) | `sql` | procedures / functions / views / triggers / tables, params, table reads & writes, column reads & writes with the owning table resolved, `EXEC` calls, `RAISERROR`/`THROW`, return codes, `CHECK` constraints, seed rows, comparisons, numeric literals, expression fingerprints, comments |
 | **VB.NET** | `.vb` | `Microsoft.CodeAnalysis.VisualBasic` 4.8 (syntax only) | `vb` | types (incl. WinForms detection), methods & properties, fields, constants, method→method calls (receiver-type resolved), stored-procedure references, inline SQL (literals + `&=` fragments, parsed with ScriptDom), literals in a decision context, constant uses, comparisons with operands split, expression fingerprints, DB column references via row indexers, local aliases, attributes, enums, external-I/O calls, comments |
 | **C#** | `.cs` | `Microsoft.CodeAnalysis.CSharp` 4.8 (syntax only) | `cs` | **the same facts, same keys as VB** — classes/structs/records/interfaces, methods, constructors, local functions, properties, fields, `const` **and `static readonly`** thresholds, method→method calls, stored-procedure references (`SqlCommand("usp_X")`, `CommandType.StoredProcedure`, proc-name literals), inline SQL (literals, `+` concatenation, interpolated and raw strings, `+=` fragments), literals in a decision context, constant uses, comparisons plus `switch`/switch-expression arms, expression fingerprints, column references via `row["Col"]` / `AddWithValue("@Col")`, local aliases, attributes, enums, external-I/O calls, `//` `/* */` and `///` comments |
+| **Python** | `.py` | Tree-sitter, `tree-sitter-python` | `py` | classes, functions, methods (line ranges incl. decorators), `import x` / `from a import b` (relative imports resolved; each import flagged `external` / `stdlib` / `resolved_file`), every call site, calls resolved to a corpus definition (same class and bases, same file, imports, receiver types from annotations / `x = Cls()` / `self.x = Cls()`), tables read/written by SQL in string literals |
+| **Java** | `.java` | Tree-sitter, `tree-sitter-java` | `java` | the same keys: classes/interfaces/enums/records, methods and constructors, imports, calls resolved through `this`, fields, locals, parameters, same package and wildcard imports, SQL in string literals |
+| **JavaScript / TypeScript** | `.js .jsx .mjs .cjs .ts .tsx` | Tree-sitter, `tree-sitter-javascript`, `tree-sitter-typescript` | `js` | the same keys: classes, methods, functions and arrow functions, ES `import` and `require()`, calls resolved through `this`, imports, `new`, TS annotations and parameter properties, SQL in string literals |
 | anything else | — | not parsed | `files` only | the file is still inventoried (with its line count) and its quoted strings feed the shared-literal detector, so an unparsed language is **declared, never silently dropped** |
 
 Notes on the C# rig:
@@ -71,6 +75,17 @@ python3 runtimes/facts/build_facts.py build \
 Facts are an **enhancement, never a gate**: if `dotnet` is missing or the tool fails,
 `facts_status.json` records `{"status": "skipped", "reason": ...}`, nothing is written under
 `pages/`, and the exit code is still 0 so the run continues without facts.
+
+Tree-sitter runs whether or not `dotnet` is installed. When the manifest has a `.py`, `.java`,
+`.js`/`.ts` (etc.) file, its sections are merged into the Roslyn output, or into an empty
+Roslyn-shaped skeleton when there is no .NET tool (`facts_status.json`: `"reason": "tree-sitter"`
+plus `"dotnet_skipped"`). A corpus with none of those files behaves exactly as before.
+`DISTILL_FACTS_TREESITTER=0` turns the Tree-sitter half off. The sections use the Roslyn keys
+(`types`, `methods`, `calls`, `inline_sql`) plus `imports` and `call_sites`, so
+`code_graph.FactsIndex` confirms and backfills Python edges (tagged `facts:py_call`,
+`facts:py_import_external`, `facts:py_inline_sql`, ...) with no per-language branch. Call
+resolution is syntactic: a call through a receiver whose type is not visible in the file (a
+return value, a dict entry, duck typing) stays an unresolved `call_sites` entry, never a guessed edge.
 
 Standalone, with a local .NET 8 SDK:
 

@@ -33,7 +33,7 @@ wherever it can and an LLM judge, with error bars, where meaning has to be compa
 ```mermaid
 flowchart LR
     SRC["Source tree<br/>(VB.NET, C#, T-SQL, reports)"] --> PAGE["Enumerate + page<br/>(every line exactly once)"]
-    PAGE --> FACTS["Parser facts<br/>(.NET Roslyn + ScriptDom, optional)"]
+    PAGE --> FACTS["Parser facts<br/>(Tree-sitter; .NET Roslyn + ScriptDom, optional)"]
     PAGE --> MAP["Map: 11 extraction passes per page<br/>(Amazon Bedrock Converse, prompt caching)"]
     FACTS --> MAP
     MAP --> REDUCE["Reduce + reconcile<br/>per pass"]
@@ -44,8 +44,9 @@ flowchart LR
 ```
 
 Text version of the diagram: the source tree is enumerated and split into line-numbered pages, with
-a conservation check that every line is paged exactly once. An optional .NET parser adds structural
-facts. Each page goes through eleven specialised extraction passes ("stills") on Amazon Bedrock.
+a conservation check that every line is paged exactly once. Parsers add structural facts:
+Tree-sitter for Python, Java and JavaScript/TypeScript, and an optional .NET parser for VB.NET, C#
+and T-SQL. Each page goes through eleven specialised extraction passes ("stills") on Amazon Bedrock.
 The findings are reduced, embedded locally, linked into concept and code graphs, then blended and
 "bottled" into a business-facing specification and an issues report, both with verified citations.
 A static HTML viewer presents the result, and the evaluation harness scores it.
@@ -54,7 +55,7 @@ A static HTML viewer presents the result, and the evaluation harness scores it.
 |---|---|---|
 | Orchestration, phases, budget gate, resume | `run_distillation.sh` | no |
 | Paging and conservation check | `runtimes/pipeline/concat-batch.sh`, `check-page-conservation.py` | no |
-| Parser facts (VB.NET, C#, T-SQL) | `runtimes/facts/` (.NET 8) | no |
+| Parser facts (VB.NET, C#, T-SQL; Python, Java, JS/TS) | `runtimes/facts/` (.NET 8; Tree-sitter) | no |
 | Extraction prompts | `still_specs/*/prompt.md`, `spec.md` | (prompt text) |
 | Map / reduce, retries, congestion control | `runtimes/mcp-server/jobs.py`, `pagecentric_invoke.py`, `bedrock_client.py` | yes |
 | Knowledge layer (embeddings, graphs) | `runtimes/mcp-server/knowledge.py`, `code_graph.py`, `export_graph.py` | partly (code graph) |
@@ -91,7 +92,8 @@ More detail: [docs/RUN_GUIDE.md](docs/RUN_GUIDE.md) (inputs, steps, outputs),
 - **Python 3.10 or newer** and the [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 - **.NET 8 SDK** (optional) for the parser-facts stage:
   [download](https://dotnet.microsoft.com/download/dotnet/8.0). Without it, runs continue without
-  structural facts.
+  VB.NET/C#/T-SQL structural facts (Python, Java and JavaScript/TypeScript facts come from
+  Tree-sitter wheels and need no SDK).
 - **Docker** (optional) to build the parser in a container instead of installing the .NET SDK.
 - Linux or macOS, about 5 GB of free disk for the Python environment and the embedding model.
 
@@ -247,7 +249,7 @@ transfer to real systems, and a new run will differ.
 | `run_distillation.sh`, `setup.sh`, `check-dependencies.sh` | Pipeline entry point, local setup, preflight check |
 | `runtimes/mcp-server/` | Pipeline stages, Bedrock client, local launcher/viewer servers, MCP servers, tests |
 | `runtimes/pipeline/` | Paging, conservation check, viewer generator |
-| `runtimes/facts/` | .NET 8 structural-facts parser (Roslyn, ScriptDom) and its Python post-processing |
+| `runtimes/facts/` | Structural-facts parsers (.NET 8 Roslyn + ScriptDom; Tree-sitter for Python, Java, JS/TS) and their Python post-processing |
 | `still_specs/` | Extraction specifications and prompts, one folder per pass |
 | `samples/ap-invoices/` | Synthetic input for the quick start (no answer key) |
 | `synthetic-corpus/` | Synthetic corpora with their answer keys |
@@ -294,7 +296,9 @@ Downloaded at setup or run time, not bundled. Each is governed by its own licenc
 
 - Python packages (`runtimes/mcp-server/requirements.txt`, `runtimes/pipeline/requirements.txt`,
   `requirements-dev.txt`): boto3, mcp, sentence-transformers (with PyTorch), networkx, numpy,
-  hnswlib, olefile, PyYAML, markdown; for tests pytest, hypothesis, jsonschema.
+  hnswlib, olefile, PyYAML, markdown, tree-sitter with the tree-sitter-python, tree-sitter-java,
+  tree-sitter-javascript and tree-sitter-typescript grammars (all MIT); for tests pytest,
+  hypothesis, jsonschema.
 - Embedding model [`sentence-transformers/all-mpnet-base-v2`](https://huggingface.co/sentence-transformers/all-mpnet-base-v2)
   (Apache-2.0), downloaded from Hugging Face by `setup.sh`.
 - NuGet packages for the parser (`runtimes/facts/structure/LeanStructure.csproj`):

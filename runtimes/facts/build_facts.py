@@ -8,16 +8,20 @@ Runs after paging and the conservation check, before map:
   1. Stage the enumerated source files (the page manifest) under <out>/source/ as symlinks, so the
      structure tool sees exactly the files that were paged, with the same relative paths.
   2. Run the .NET structure tool (runtimes/facts/structure: Roslyn for VB.NET and C#, ScriptDom for
-     T-SQL) -> raw facts on stdout.
+     T-SQL) -> raw facts on stdout, then Tree-sitter (treesitter_facts.py: Python, Java,
+     JavaScript/TypeScript) and merge its `py` / `java` / `js` sections in. Either one alone is
+     enough: without dotnet the Tree-sitter sections go into an empty Roslyn-shaped skeleton.
   3. Enrich with facts_post (cross-layer comparison and duplicate-logic candidates, contracts, ...)
      -> <out>/facts.json and <out>/graph.json.
   4. Render one bounded facts block per page -> <out>/pages/page_NNN.md (facts_block.py). The map
      phase appends that block to the page text.
   5. Write <out>/facts_status.json: {"status": "ok" | "skipped", "reason", "counts", "blocks_hash"}.
 
-Facts are an enhancement. When dotnet or the tool is unavailable, or the tool fails, the status is
-"skipped" with a reason, nothing is written under pages/, and the exit code is still 0 so the
-pipeline continues without facts. Exit code 2 is reserved for bad arguments.
+Facts are an enhancement. When neither parser has anything to parse (no dotnet or the tool fails,
+and no file in a Tree-sitter language), the status is "skipped" with a reason, nothing is written
+under pages/, and the exit code is still 0 so the pipeline continues without facts. A .NET failure
+with Tree-sitter facts present keeps the Tree-sitter facts and records the .NET reason.
+Exit code 2 is reserved for bad arguments.
 
 Usage:
   build_facts.py build --source-root S --manifest M --pages P --out O --page-budget N
@@ -29,6 +33,7 @@ Environment:
   DISTILL_FACTS_CMD     full command that takes the source root as its last argument and prints raw
                         facts JSON (overrides dotnet; used by tests)
   DISTILL_FACTS_BUILD   1 (default) = build the tool with `dotnet publish` when the dll is missing
+  DISTILL_FACTS_TREESITTER  1 (default) = also parse Python / Java / JS / TS with Tree-sitter
 """
 from __future__ import annotations
 
@@ -47,6 +52,7 @@ sys.path.insert(0, str(HERE))
 
 import facts_block  # noqa: E402
 import facts_post  # noqa: E402
+import treesitter_facts  # noqa: E402
 
 STRUCTURE_DIR = HERE / "structure"
 DEFAULT_DLL = STRUCTURE_DIR / "out" / "LeanStructure.dll"
@@ -115,6 +121,41 @@ def run_tool(prefix: list[str], src: Path, timeout: float = 1800) -> dict:
     return json.loads(r.stdout)
 
 
+# What the structure tool's `derived` section always carries; facts_post reads these keys directly.
+_DERIVED_KEYS = ("proc_index", "missing_procs", "vb_methods_without_callers", "cs_methods_without_callers",
+                 "vb_event_handlers", "table_index", "cross_layer_name_matches", "shared_numeric_values",
+                 "comment_mentions", "commented_out_code")
+
+
+def empty_facts(src: Path, staged: list[str]) -> dict:
+    """A Roslyn-shaped facts dict with no .NET facts (no dotnet), so facts_post and the page blocks
+    run unchanged on Tree-sitter sections. Every staged file is inventoried, as the tool does."""
+    files = []
+    for rel in staged:
+        try:
+            n = (src / rel).read_bytes().count(b"\n") + 1
+        except OSError:
+            n = 1
+        files.append({"file": rel, "language": None, "start": 1, "end": n})
+    return {"schema": "lean-facts/v1", "tools": {}, "files": files,
+            "vb": {k: [] for k in facts_post.CLR_KEYS}, "cs": {k: [] for k in facts_post.CLR_KEYS},
+            "sql": {"procs": [], "triggers": [], "tables": [], "seed_rows": [], "scripts": [],
+                    "numeric_literals": [], "parse_errors": []},
+            "comments": [], "derived": {**{k: [] for k in _DERIVED_KEYS}, "counts": {}}}
+
+
+def treesitter_enabled() -> bool:
+    return os.environ.get("DISTILL_FACTS_TREESITTER", "1") == "1"
+
+
+def treesitter_rels(source_root: Path, manifest: Path) -> list[str]:
+    """Manifest entries in a language treesitter_facts can parse (empty when disabled)."""
+    if not treesitter_enabled() or not manifest.is_file():
+        return []
+    rels = (r.strip() for r in manifest.read_text(encoding="utf-8").splitlines())
+    return [r for r in rels if r and treesitter_facts.supported(r) and (source_root / r).is_file()]
+
+
 def counts(facts: dict) -> dict:
     vb, cs, sql, v1 = (facts.get("vb", {}), facts.get("cs", {}), facts.get("sql", {}),
                        facts.get("v1", {}))
@@ -139,6 +180,9 @@ def counts(facts: dict) -> dict:
         "cross_layer_candidates": len(v1.get("cross_layer_candidates", [])),
         "duplicate_candidates": len(v1.get("duplicate_candidates", [])),
         "db_checks": len(v1.get("db_checks", [])),
+        **{f"{sect}_{k}": len((facts.get(sect) or {}).get(k, []))
+           for sect in treesitter_facts.SECTIONS
+           for k in ("types", "methods", "calls", "imports", "inline_sql")},
     }
 
 
@@ -184,15 +228,35 @@ def build(source_root: Path, manifest: Path, pages_dir: Path, out: Path, page_bu
             p.unlink()
     max_chars = int(page_budget * max_fraction * CHARS_PER_TOKEN)
     base = {"page_budget_tokens": page_budget, "max_fraction": max_fraction, "max_block_chars": max_chars}
-    prefix, how = resolve_tool()
-    if prefix is None:
-        return _write_status(out, {"status": "skipped", "reason": how, **base})
     src = out / "source"
+    # Tree-sitter first: it needs no SDK, and whether it has anything to parse decides whether a
+    # missing or failing .NET tool still leaves this run with facts.
+    ts_rels = treesitter_rels(source_root, manifest)
+    prefix, how = resolve_tool()
+    if prefix is None and not ts_rels:
+        return _write_status(out, {"status": "skipped", "reason": how, **base})
     staged = stage_source(source_root, manifest, src)
+    ts_rels = [r for r in ts_rels if r in set(staged)]
     if not staged:
         return _write_status(out, {"status": "skipped", "reason": "no manifest files to parse", **base})
+    dotnet_note = None
     try:
-        facts = run_tool(prefix, src)
+        facts = None
+        if prefix is not None:
+            try:
+                facts = run_tool(prefix, src)
+            except Exception as e:  # noqa: BLE001 - with Tree-sitter facts the run keeps those
+                if not ts_rels:
+                    raise
+                dotnet_note = f"{type(e).__name__}: {e}"[:300]
+        else:
+            dotnet_note = how
+        if facts is None:
+            facts = empty_facts(src, staged)
+        if ts_rels:
+            ts = treesitter_facts.extract(src, ts_rels)
+            treesitter_facts.merge(facts, ts)
+            how = f"{how}+tree-sitter" if dotnet_note is None else "tree-sitter"
         facts = facts_post.enrich(facts, src)
     except Exception as e:  # noqa: BLE001 - any tool/parse failure degrades to "no facts"
         return _write_status(out, {"status": "skipped", "reason": f"{type(e).__name__}: {e}"[:500], **base})
@@ -205,6 +269,8 @@ def build(source_root: Path, manifest: Path, pages_dir: Path, out: Path, page_bu
     pages = write_page_blocks(facts, pages_dir, out / "pages", max_chars)
     status = {"status": "ok", "reason": how, **base, "staged_files": len(staged), "counts": counts(facts),
               "pages": pages}
+    if dotnet_note:
+        status["dotnet_skipped"] = dotnet_note
     _write_status(out, status)
     status["blocks_hash"] = blocks_hash(out)
     return _write_status(out, status)
@@ -239,7 +305,11 @@ def main() -> int:
              f"{c['vb_proc_refs'] + c['cs_proc_refs']} client->proc refs, "
              f"{c['sql_procs']} procs, {c['sql_tables']} tables, "
              f"{c['vb_constants'] + c['cs_constants']} constants, {c['cross_layer_candidates']} cross-layer + "
-             f"{c['duplicate_candidates']} duplicate candidates; page blocks "
+             f"{c['duplicate_candidates']} duplicate candidates; "
+             + "".join(f"{s}: {c[s + '_types']} types, {c[s + '_methods']} functions/methods, "
+                       f"{c[s + '_calls']} resolved calls, {c[s + '_imports']} imports; "
+                       for s in treesitter_facts.SECTIONS if c[s + "_methods"] or c[s + "_imports"])
+             + f"page blocks "
              f"{sum(1 for s in sizes if s)}/{len(sizes)} (max {max(sizes, default=0)} chars, "
              f"bound {st['max_block_chars']})")
     else:
