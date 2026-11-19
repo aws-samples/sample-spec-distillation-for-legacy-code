@@ -94,6 +94,42 @@ OUTPUT FORMAT:
 
 # ── Core Logic ───────────────────────────────────────────────────────────────
 
+# Requirement-id prefix per still (feedback_evidence.py keeps an equal table; a test checks it).
+STILL_PREFIXES = {
+    "domain_language": "DL", "data": "DT", "rule": "RL", "workflow": "WF",
+    "state": "ST", "permission": "PM", "exception": "EX", "test": "TS",
+    "interface": "IF", "history": "HI", "runtime": "RT",
+}
+# knowledge.py writes this line under each materialized file's title (`# Persistent Objects`).
+STILL_META_RX = re.compile(r"^<!--\s*still:\s*([A-Za-z0-9_]+)\s*[|>-]", re.MULTILINE)
+
+
+def still_prefix_for(input_path: str, doc_title: str = "", input_text: str = "",
+                     still: str | None = None) -> tuple[str, str, str]:
+    """(still, id prefix, how it was found) for a file the format pass reads. In order:
+      1. `still`, when the caller knows it (format_all_stills passes the still directory name);
+      2. the knowledge layer's metadata line `<!-- still: NAME | concepts: N | ... -->`;
+      3. the path: .../stills/<still>/final[...]/file.md;
+      4. legacy: a still name inside the file stem or the document title (titles used to read
+         `# data — Persistent Objects`; since the knowledge layer writes `# Persistent Objects`
+         this alone gave 181 of 328 AP requirements an `XX-` id).
+    ("", "XX", "unknown") when none applies."""
+    if still and still in STILL_PREFIXES:
+        return still, STILL_PREFIXES[still], "argument"
+    m = STILL_META_RX.search(input_text[:4096] if input_text else "")
+    if m and m.group(1) in STILL_PREFIXES:
+        return m.group(1), STILL_PREFIXES[m.group(1)], "metadata"
+    parts = Path(input_path).parts
+    for i, p in enumerate(parts):
+        if p.startswith("final") and i > 0 and parts[i - 1] in STILL_PREFIXES:
+            return parts[i - 1], STILL_PREFIXES[parts[i - 1]], "path"
+    input_lower = Path(input_path).stem.lower() + " " + (doc_title or "").lower()
+    for still_name, prefix in STILL_PREFIXES.items():
+        if still_name in input_lower:
+            return still_name, prefix, "name"
+    return "", "XX", "unknown"
+
+
 
 def format_manifest_file(
     input_path: str,
@@ -104,6 +140,7 @@ def format_manifest_file(
     max_blocks_per_chunk: int = MAX_BLOCKS_PER_CHUNK,
     concurrency: int = 10,
     max_tokens: int = 128000,
+    still: str | None = None,
 ) -> dict:
     """Format a raw manifest file into a polished spec document.
 
@@ -119,6 +156,9 @@ def format_manifest_file(
         max_blocks_per_chunk: Max blocks per LLM call
         concurrency: Max parallel LLM calls
         max_tokens: Max output tokens per chunk call
+        still: The still the file belongs to (sets the requirement id prefix). Optional: when
+            absent it is read from the file's `<!-- still: NAME | ... -->` metadata line or its
+            stills/<still>/final/ path (still_prefix_for).
 
     Returns:
         Stats dict with block counts and verification results.
@@ -348,19 +388,14 @@ def format_manifest_file(
         pass
 
     # Global renumbering: replace chunk-local IDs (C{NN}.{NNN}) with still-prefixed sequential IDs.
-    # Still prefix derived from the document title / input path.
-    STILL_PREFIXES = {
-        "domain_language": "DL", "data": "DT", "rule": "RL", "workflow": "WF",
-        "state": "ST", "permission": "PM", "exception": "EX", "test": "TS",
-        "interface": "IF", "history": "HI", "runtime": "RT",
-    }
-    # Detect still name from doc_title or input path
-    still_prefix = "XX"
-    input_lower = Path(input_path).stem.lower() + " " + doc_title.lower()
-    for still_name, prefix in STILL_PREFIXES.items():
-        if still_name in input_lower:
-            still_prefix = prefix
-            break
+    # The still is carried explicitly (still_prefix_for: the caller's `still`, the knowledge
+    # layer's `<!-- still: NAME | ... -->` metadata line, or the stills/<still>/final/ path), not
+    # guessed from the document title, which no longer names the still (docs/EDGE_CASES.md L31).
+    _still_for_id, still_prefix, _prefix_source = still_prefix_for(
+        input_path, doc_title, input_text, still=still)
+    if still_prefix == "XX":
+        print(f"    {_log_prefix} WARNING: could not tell which still this file belongs to; "
+              f"requirement ids get the XX- prefix", flush=True)
 
     # Vend UNIQUE, stable IDs from the single authoritative vending machine
     # (replaces the old per-file counter that reset to 0001 and collided across
@@ -571,6 +606,7 @@ def format_all_stills(
                 profile=profile,
                 region=region,
                 model_id=model_id,
+                still=still_name,
             )
             still_results[f"{still_name}/{raw_file.name}"] = result
 
