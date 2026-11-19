@@ -97,6 +97,7 @@ check_cmd "mcp" "${PYTHON}" -c "from mcp.server import FastMCP; print('OK')"
 check_cmd "torch" "${PYTHON}" -c "import torch; print(torch.__version__)"
 check_cmd "hnswlib" "${PYTHON}" -c "import hnswlib; print('OK')"
 check_cmd "olefile" "${PYTHON}" -c "import olefile; print(olefile.__version__)"
+check_cmd "tree-sitter" "${PYTHON}" -c "import tree_sitter, tree_sitter_python, tree_sitter_java, tree_sitter_javascript, tree_sitter_typescript; print('OK')"
 echo ""
 
 # ── 3. AWS Credentials ───────────────────────────────────────────────────────

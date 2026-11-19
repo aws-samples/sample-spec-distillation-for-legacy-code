@@ -104,15 +104,17 @@ def _concept_title(concept_text):
 
 def _field_value(concept_text, label):
     """Return the value(s) of a '- Label:' field, including a following fenced
-    block for Statement. Best-effort, single field."""
+    block for Statement. The label may be bold ('- **Label:**'), which is how the
+    format pass usually writes it. Best-effort, single field."""
     lines = concept_text.split("\n")
     out = []
     capturing = False
     in_fence = False
     for line in lines:
         if not capturing:
-            if line.startswith(f"- {label}:"):
-                out.append(line.split(":", 1)[1].strip())
+            m = re.match(rf"^- (?:\*\*)?{re.escape(label)}:(?:\*\*)?(.*)$", line)
+            if m:
+                out.append(m.group(1).strip())
                 capturing = True
             continue
         stripped = line.strip()
@@ -123,7 +125,7 @@ def _field_value(concept_text, label):
             out.append(stripped)
             continue
         # stop at next top-level field
-        if re.match(r'^- [A-Z][^:]*:', line):
+        if re.match(r'^- (?:\*\*)?[A-Z][^:]*:', line):
             break
         if line.strip() == "" and not in_fence:
             # allow blank within, but a blank then next field handled above

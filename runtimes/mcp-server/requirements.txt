@@ -9,3 +9,9 @@ numpy>=1.26.0
 hnswlib>=0.8.0
 olefile>=0.47            # ingest helper: list streams of OLE compound-document binaries (.rpt)
 PyYAML>=6.0
+# Phase 1.2 structural facts for Python / Java / JavaScript / TypeScript (runtimes/facts/treesitter_facts.py)
+tree-sitter>=0.23
+tree-sitter-python>=0.23
+tree-sitter-java>=0.23
+tree-sitter-javascript>=0.23
+tree-sitter-typescript>=0.23
