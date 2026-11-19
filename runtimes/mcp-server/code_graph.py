@@ -19,7 +19,7 @@ Design (validated in experiments/dep-graph-poc):
     tokens are preserved as `unverified_tag` (never discarded).
   - Provenance: model id + timestamp + page stamped on every file.
   - Deterministic parser preferred: where <run>/facts/facts.json exists (Roslyn VB.NET + C#,
-    ScriptDom T-SQL, Tree-sitter Python — runtimes/facts), a model-proposed relation the parser also has is confirmed
+    ScriptDom T-SQL, Tree-sitter Python/Java/JS/TS — runtimes/facts), a model-proposed relation the parser also has is confirmed
     outright and the parser's operation/direction win; a relation the parser found and the model
     missed is BACKFILLED, tagged `facts:*` in code_edges.symbol so the model-proposed and
     parser-backed populations stay separable. See FactsIndex.
@@ -32,6 +32,11 @@ whole-language blind spot cannot hide behind an "it is a different shape" story)
     csharp  the same as vbnet, in C# spelling
     python  function/method calls, imports (incl. external libraries), table reads/writes from SQL
             strings and ORM usage; same JSON shape as C#/VB, so the CLR branch handles it
+    java    the same as python, in Java spelling: method/constructor calls, imports (incl. external
+            packages), tables from SQL strings and JPA/Hibernate/Spring Data/JDBC usage
+    javascript / typescript (.js .jsx .mjs .cjs / .ts .tsx)  the same again: function/method calls,
+            ES import / require() (incl. npm packages), tables from SQL strings and
+            TypeORM/Prisma/Sequelize/Knex usage
     cobol   CALL/COPY/file access
 
 Cost (Haiku 4.5): output-dominated (output priced ~5x input),
@@ -66,7 +71,10 @@ PRICE_IN, PRICE_OUT = 1.0, 5.0  # $/M tokens (Haiku 4.5 US)
 MAX_ERROR_RATE = float(os.environ.get("DISTILL_CODE_GRAPH_MAX_ERROR_RATE", "0.2"))
 
 CODE_EXTS = {"sql": "sql", "cs": "csharp", "vb": "vbnet",
-             "cob": "cobol", "cbl": "cobol", "cpy": "cobol", "py": "python"}  # reasonable SEED, not a finish line;
+             "cob": "cobol", "cbl": "cobol", "cpy": "cobol", "py": "python",
+             "java": "java",
+             "js": "javascript", "jsx": "javascript", "mjs": "javascript", "cjs": "javascript",
+             "ts": "typescript", "tsx": "typescript"}  # reasonable SEED, not a finish line;
 # untapped languages are surfaced by preflight + a path-to-cover reasoned by the rectifier
 # (raw-extractable → new _LANG_PROMPTS template; needs intermediary → ingest-helper spec).
 # See spec L-coverage-doctrine + code-graph-arbitration X-cga-B2/B3.
@@ -370,10 +378,147 @@ Source:
 ```
 Output ONLY the JSON object."""
 
+JAVA_SYSTEM = ("You are a precise Java analyst. You trace, for every file, who it CALLS, which packages "
+               "and external libraries it IMPORTS and which database tables it READS and WRITES — "
+               "including SQL in string literals and access through JPA/Hibernate, Spring Data or JDBC. "
+               "You also decode abbreviated identifiers. Output ONLY one JSON object, no prose, no fences.")
+JAVA_USER = """Analyze this Java file: {path}
+
+Emit JSON:
+"file_role": "controller"|"service"|"repository"|"entity"|"dto"|"test"|"config"|"utility"|"cli"|"other"
+"module": the source system's short business-area/module code if clearly inferable, else null
+"business_intent": ONE short sentence
+"usings": [imports, as written without `import`/`static`/`;`: `import com.acme.Order;` ->
+    "com.acme.Order", `import org.springframework.data.jpa.repository.*;` ->
+    "org.springframework.data.jpa.repository"]   (java.* AND third-party AND this system's packages)
+"declarations": [{{"name":"Class / interface / enum / record","kind":"class"|"interface"|"enum"|"record",
+    "base":"<extends type or null>","implements":[implemented interfaces]}}]
+"calls": [{{"caller":"<enclosing Class.method>",
+    "callee":"<method name, qualified Class.method when the receiver's class is known; a constructor
+    is the class name>","receiver":"<the receiver expression as written, or null>","confidence":<0.0-1.0>}}]
+"data_refs": [{{"name":"<table / view / stored procedure, VERBATIM from the source>",
+    "kind":"table"|"view"|"stored_procedure"|"function",
+    "operation":"select"|"insert"|"update"|"delete"|"merge"|"join"|"exec"|"unknown",
+    "direction":"read"|"write"|"call",
+    "via":"inline_sql"|"orm"|"dal"|"proc_literal"|"other",
+    "resolution":"static"|"dynamic_sql","confidence":<0.0-1.0>}}]
+"references": [{{"symbol":"package.Type","kind":"type"|"call"|"instantiate"|"inherit"|"annotation",
+    "resolution":"local"|"remote"|"builtin","gateway":"<imported package or null>","confidence":<0.0-1.0>}}]
+"business_entities": [{{"code_name":"...","business_name":"...","confidence":<0.0-1.0>}}]
+
+How to find each relation:
+- calls: every call of a method or constructor defined in THIS system — `foo()`, `this.foo()`,
+  `repo.foo()`, `Util.foo()`, `new Order(...)`, `super.foo()`. Qualify with the class when the
+  receiver's type is visible (a field, a parameter, a local, an injected `@Autowired` field).
+  SKIP JDK and library members (System.out.println, String/List/Map/Optional/stream methods,
+  logger calls, getters of library types).
+- imports: every `import` / `import static` — these are the IMPORTS edges, including the
+  external libraries (org.springframework..., jakarta.persistence, org.hibernate, lombok, ...).
+- tables: every table or view named in SQL text in this file (a literal, a text block, a
+  concatenation, a `prepareStatement(...)` / `jdbcTemplate.query(...)` / `@Query(nativeQuery=true)`
+  argument), and a JPA entity whose table is stated in this file (`@Table(name = "orders")`,
+  `@Entity(name = ...)`, `@JoinTable(name = ...)`, `@SecondaryTable`): for a mapped entity emit
+  the table with via "orm", operation "unknown", direction "read". A repository / EntityManager
+  call on such an entity (`orderRepository.save(o)`, `em.persist(o)`, `findById`, `deleteBy...`):
+  via "orm", direction write for save/persist/merge/delete/update, read for find/get/query/count.
+- tables via a repository: when the called data-access method's own name names the table, emit it
+  with via "dal" and confidence <= 0.6. Never invent a table that is nowhere named in this file.
+- stored procedures: `prepareCall("{{call x}}")`, `@Procedure("x")`, `StoredProcedureQuery("x")`,
+  `EXEC x` in a SQL string -> kind "stored_procedure", "exec", "call".
+- SQL assembled at runtime -> resolution "dynamic_sql"; never guess the assembled part.
+
+TWO THINGS NOT TO DO (both are checked, and both cost precision):
+- A method of THIS system is a CALL, not a stored procedure or a table.
+- A name that appears only in a COMMENT or Javadoc is not a dependency of this file.
+
+Rules: one entry per DISTINCT relation; every `name` in data_refs and every `callee` in calls MUST
+appear verbatim in the source below (a deterministic checker verifies this); gateway MUST be one of
+the usings or null.
+
+Source:
+```java
+{source}
+```
+Output ONLY the JSON object."""
+
+_JS_SYSTEM_T = ("You are a precise @@LANG@@ analyst. You trace, for every file, who it CALLS, which "
+                "modules and npm packages it IMPORTS and which database tables it READS and WRITES — "
+                "including SQL in string and template literals and access through an ORM or query "
+                "builder (TypeORM, Prisma, Sequelize, Knex, Mongoose). You also decode abbreviated "
+                "identifiers. Output ONLY one JSON object, no prose, no fences.")
+_JS_USER_T = """Analyze this @@LANG@@ file: {path}
+
+Emit JSON:
+"file_role": "controller"|"service"|"repository"|"entity"|"dto"|"test"|"config"|"utility"|"cli"|"component"|"other"
+"module": the source system's short business-area/module code if clearly inferable, else null
+"business_intent": ONE short sentence
+"usings": [module specifiers, as written: `import x from 'axios'` -> "axios",
+    `import {{ A }} from './models/order'` -> "./models/order", `require('pg')` -> "pg",
+    `import('./lazy')` -> "./lazy"]   (Node built-ins AND npm packages AND local files)
+"declarations": [{{"name":"Class, exported/top-level function or arrow function, interface, enum",
+    "kind":"class"|"function"|"interface"|"enum"|"type",
+    "base":"<extends class or null>","implements":[implemented interfaces]}}]
+"calls": [{{"caller":"<enclosing function or Class.method, or null at module level>",
+    "callee":"<function or method name, qualified Class.method when the receiver's class is known;
+    `new X()` is the class name X>","receiver":"<the receiver expression as written, or null>",
+    "confidence":<0.0-1.0>}}]
+"data_refs": [{{"name":"<table / view / stored procedure / ORM model's table, VERBATIM from the source>",
+    "kind":"table"|"view"|"stored_procedure"|"function",
+    "operation":"select"|"insert"|"update"|"delete"|"merge"|"join"|"exec"|"unknown",
+    "direction":"read"|"write"|"call",
+    "via":"inline_sql"|"orm"|"dal"|"proc_literal"|"other",
+    "resolution":"static"|"dynamic_sql","confidence":<0.0-1.0>}}]
+"references": [{{"symbol":"module.Name","kind":"type"|"call"|"instantiate"|"inherit"|"decorator",
+    "resolution":"local"|"remote"|"builtin","gateway":"<imported module or null>","confidence":<0.0-1.0>}}]
+"business_entities": [{{"code_name":"...","business_name":"...","confidence":<0.0-1.0>}}]
+
+How to find each relation:
+- calls: every call of a function, method or class defined in THIS system — `foo()`, `this.foo()`,
+  `obj.foo()`, `svc.foo()`, an imported `foo()`, `new Order(...)`, `super.foo()`. Qualify with the
+  class when the receiver's class is visible (`this`, a constructor parameter property, a type
+  annotation, `const x = new Repo()`). SKIP built-ins and library members (console.log, JSON.*,
+  Math.*, Array/String/Promise/Object methods, fetch, res.send/res.json, express/router wiring).
+- imports: every ES `import` (incl. `import type`), `export ... from`, `require()` and `import()` —
+  these are the IMPORTS edges, including the npm packages (express, axios, typeorm, @prisma/client,
+  sequelize, knex, @nestjs/common, ...) the business logic depends on.
+- tables: every table or view named in SQL text in this file (a string, a template literal, a
+  `query(...)` / `pool.query(...)` / `sequelize.query(...)` / `knex.raw(...)` argument), a table
+  named to a query builder (`knex('orders')`, `db('orders').insert(...)`), and an ORM model whose
+  table is stated in this file (`@Entity('orders')`, `@Entity({{ name: 'orders' }})`,
+  `sequelize.define('order', ..., {{ tableName: 'orders' }})`, `tableName: 'orders'`), or a query on
+  such a model (`repo.find(...)`, `Order.findAll(...)`, `prisma.order.create(...)`,
+  `getRepository(Order).save(...)`): via "orm"; direction read for find/findOne/findAll/count/
+  select/where, write for save/insert/create/update/upsert/delete/destroy/remove.
+- tables via a repository: when the called data-access method's own name names the table, emit it
+  with via "dal" and confidence <= 0.6. Never invent a table that is nowhere named in this file.
+- stored procedures: `CALL x(...)` / `EXEC x` in a SQL string -> kind "stored_procedure", "exec", "call".
+- SQL assembled at runtime (template literal with `${{...}}` in the table position, concatenation)
+  -> resolution "dynamic_sql"; never guess the assembled part.
+
+TWO THINGS NOT TO DO (both are checked, and both cost precision):
+- A function or method of THIS system is a CALL, not a stored procedure or a table.
+- A name that appears only in a COMMENT or JSDoc is not a dependency of this file.
+
+Rules: one entry per DISTINCT relation; every `name` in data_refs and every `callee` in calls MUST
+appear verbatim in the source below (a deterministic checker verifies this); gateway MUST be one of
+the usings or null.
+
+Source:
+```@@FENCE@@
+{source}
+```
+Output ONLY the JSON object."""
+# One template for JavaScript and TypeScript (the relations are the same; the label and fence differ).
+JS_SYSTEM = _JS_SYSTEM_T.replace("@@LANG@@", "JavaScript")
+JS_USER = _JS_USER_T.replace("@@LANG@@", "JavaScript").replace("@@FENCE@@", "javascript")
+TS_SYSTEM = _JS_SYSTEM_T.replace("@@LANG@@", "TypeScript")
+TS_USER = _JS_USER_T.replace("@@LANG@@", "TypeScript").replace("@@FENCE@@", "typescript")
+
 # lang → (system, user) prompt. Default (unknown lang) uses the C# template (closest general shape).
 _LANG_PROMPTS = {"sql": (SQL_SYSTEM, SQL_USER), "csharp": (CS_SYSTEM, CS_USER),
                  "vbnet": (VB_SYSTEM, VB_USER), "cobol": (COBOL_SYSTEM, COBOL_USER),
-                 "python": (PY_SYSTEM, PY_USER)}
+                 "python": (PY_SYSTEM, PY_USER), "java": (JAVA_SYSTEM, JAVA_USER),
+                 "javascript": (JS_SYSTEM, JS_USER), "typescript": (TS_SYSTEM, TS_USER)}
 
 
 # ── SQLite schema ────────────────────────────────────────────────────────────
@@ -480,6 +625,8 @@ _MODALITY_BY_EXT = {
     # text-imperative (the only modality with a rig today)
     "sql": "text-imperative", "cs": "text-imperative", "vb": "text-imperative",
     "js": "text-imperative", "ts": "text-imperative", "py": "text-imperative",
+    "jsx": "text-imperative", "mjs": "text-imperative", "cjs": "text-imperative",
+    "tsx": "text-imperative",
     "java": "text-imperative", "cpp": "text-imperative", "c": "text-imperative",
     "h": "text-imperative", "vbs": "text-imperative", "ps1": "text-imperative",
     "rb": "text-imperative", "go": "text-imperative", "php": "text-imperative",
@@ -712,6 +859,8 @@ class FactsIndex:
                 for key in ("name", "id"):
                     if m.get(key):
                         self.method_names.add(_normalize_dst(m[key]))
+                        if ":" in m[key]:       # JS/TS ids are `<module path>:<Class.name>`
+                            self.method_names.add(_fact_bare(m[key]))
         for t in sql.get("triggers") or []:
             if t.get("file") and t.get("table"):
                 self.trigger_table[t["file"]] = t["table"]
@@ -756,7 +905,9 @@ class FactsIndex:
                         self._add(u["file"], x["proc"], "stored_procedure", "exec", "call", tag)
 
     def _add(self, file, dst, kind, operation, direction, tag):
-        bare = _norm(dst).split(".")[-1]
+        # a JS/TS symbol id is `<module path>:<Class.name>` and the path may itself hold dots
+        # (`src/order.service:create`), so it is cut at the colon before the last dotted part
+        bare = _fact_bare(dst) if kind == "method" else _norm(dst).split(".")[-1]
         if not file or not bare:
             return
         self.edges[file].append({"dst": dst, "bare": bare, "kind": kind, "operation": operation,
@@ -809,6 +960,15 @@ class FactsIndex:
         return bool(bare) and bare in self.method_names and bare not in self.proc_names
 
 
+def _fact_bare(dst) -> str:
+    """The bare (last) name of a parser symbol id, dropping a JS/TS `<module path>:` prefix."""
+    return _norm(dst).rpartition(":")[2].split(".")[-1]
+
+
+# Languages whose imports name a CLASS (`import a.b.C;`) while the parser records the package.
+_CLASS_IMPORT_LANGS = {"java"}
+
+
 def _kind_class(kind) -> str:
     k = (kind or "").strip().lower()
     if k in ("stored_procedure", "procedure", "proc", "function", "sproc"):
@@ -842,12 +1002,15 @@ def load_facts(pages_dir: Path, facts_path: str | None = None) -> tuple[dict | N
 # because "rem " also occurs inside code (`Dim rem As Integer`, `Trem (x)`) and matching it anywhere
 # would strip real code — and stripping real code is the one way this helper can do harm.
 _LINE_COMMENT = {"vbnet": ("'",), "csharp": ("//",), "sql": ("--",), "cobol": ("*>",),
-                 "python": ("#",)}
+                 "python": ("#",), "java": ("//",), "javascript": ("//",), "typescript": ("//",)}
 _WHOLE_LINE_COMMENT = {"vbnet": ("rem",), "cobol": ("*",)}
 # String delimiters the scanner respects. Python's single-quoted strings must be skipped too, or a
 # `#` inside '...' would strip code; the other languages keep the double quote only (unchanged).
-_QUOTES = {"python": ('"', "'")}
-_BACKSLASH_ESCAPES = {"python"}
+# Java adds its char literal ('/'), JS/TS single quotes and template literals (`http://x`), all with
+# backslash escapes. A template literal spanning lines is rescanned per line (conservative).
+_QUOTES = {"python": ('"', "'"), "java": ('"', "'"),
+           "javascript": ('"', "'", "`"), "typescript": ('"', "'", "`")}
+_BACKSLASH_ESCAPES = {"python", "java", "javascript", "typescript"}
 
 
 def strip_comments(body: str, lang: str) -> str:
@@ -1049,6 +1212,7 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
     # Tree-sitter languages: classes / functions / methods the parser found and the model did not
     # declare become code objects too (tagged with their source; the CLR/SQL sections add none).
     known = {_norm(d.get("name")) for d in defines}
+    consumed: set = set()     # parser edges a model edge already covers under a different bare name
     for o in facts.objects_for(path):
         if _norm(o["name"]) not in known:
             known.add(_norm(o["name"]))
@@ -1122,6 +1286,10 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
                 node["edges"].append(_mk_edge(
                     path, _norm(u), "IMPORTS", lang, "confirmed", kind="import", operation="import",
                     resolution="static", direction_verdict="parser_confirmed"))
+                if lang in _CLASS_IMPORT_LANGS:
+                    # Java `import a.b.C;` is recorded by the parser as module `a.b`, so the bare
+                    # names differ: mark the parser's import as covered or backfill would repeat it.
+                    consumed.add(("IMPORTS", hit["bare"], "import", hit["direction"]))
                 continue
             verdict = "confirmed" if _present(u, source_lower) else "unconfirmed"
             node["edges"].append(_mk_edge(
@@ -1220,6 +1388,7 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
     # and collapsing those into one key would drop whichever relation the model did not propose.
     have = {(e["type"], _normalize_dst(e["dst"]), _kind_class(e.get("kind")), e.get("direction"))
             for e in node["edges"]}
+    have |= consumed
     for fe in facts.for_file(path):
         etype = {"method": "CALLS", "trigger": "TRIGGERS", "import": "IMPORTS"}.get(fe["kind"], "REFERENCES")
         key = (etype, fe["bare"], _kind_class(fe["kind"]), fe["direction"])
