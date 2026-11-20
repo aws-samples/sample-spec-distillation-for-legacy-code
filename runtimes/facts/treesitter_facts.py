@@ -167,12 +167,15 @@ _SQL_WRITES = (("insert", re.compile(r"\binsert\s+(?:into\s+)?" + _SQL_NAME, re.
                ("merge", re.compile(r"\bmerge\s+(?:into\s+)?" + _SQL_NAME, re.I)))
 _SQL_READS = re.compile(r"\b(?:from|join)\s+" + _SQL_NAME, re.I)
 _SQL_NOT_TABLE = {"select", "set", "where", "values", "dual", "into", "lateral", "unnest"}
+# A string that starts with a SQL verb is only SQL if it also has a clause keyword: this keeps
+# prose such as 'Delete a user' or 'Update your profile' (API docs, log messages) out.
+_SQL_CLAUSE = re.compile(r"\b(?:from|into|set|values|where|join)\b", re.I)
 
 
 def sql_access(text: str) -> dict | None:
     """{reads: [{table}], writes: [{table, op}]} for a SQL-looking string, else None."""
     body = re.sub(r'^[A-Za-z]*("""|\'\'\'|"|\'|`)', "", text or "")
-    if not _SQL_START.match(body):
+    if not _SQL_START.match(body) or not _SQL_CLAUSE.search(body):
         return None
     clean = lambda n: n.strip("\"`[]").replace('"', "").replace("`", "")  # noqa: E731
     writes, seen = [], set()

@@ -286,3 +286,12 @@ def test_tree_sitter_can_be_turned_off(tmp_path, monkeypatch):
     manifest.write_text("\n".join(_rels(PY)) + "\n")
     st = build_facts.build(PY, manifest, _pages(tmp_path, _rels(PY)), tmp_path / "facts", 30000)
     assert st["status"] == "skipped"
+
+
+def test_prose_starting_with_a_sql_verb_is_not_sql():
+    import treesitter_facts as tf
+    for prose in ("'Delete a user'", '"Update your profile"', "`Insert coin`", "'Select an option'"):
+        assert tf.sql_access(prose) is None, prose
+    assert tf.sql_access("'DELETE FROM users WHERE id = $1'") == {"reads": [], "writes": [{"table": "users", "op": "delete"}]}
+    assert tf.sql_access('"select * from orders o join customers c on c.id = o.cid"')["reads"] == \
+        [{"table": "orders"}, {"table": "customers"}]

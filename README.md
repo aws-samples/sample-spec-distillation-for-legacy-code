@@ -69,6 +69,14 @@ inference profile `us.anthropic.claude-sonnet-4-6`, set with `BEDROCK_MODEL_ID`.
 uses Claude Haiku 4.5 (`DISTILL_CODE_GRAPH_MODEL`). Embeddings run locally with
 `sentence-transformers/all-mpnet-base-v2` and are never sent anywhere.
 
+Languages the code graph extracts (calls, imports, table reads/writes and code objects, one prompt
+per language in `runtimes/mcp-server/code_graph.py`): T-SQL (`.sql`), VB.NET (`.vb`), C# (`.cs`),
+COBOL (`.cob .cbl .cpy`), Python (`.py`), Java (`.java`) and JavaScript/TypeScript
+(`.js .jsx .mjs .cjs .ts .tsx`). For Python, Java and JS/TS the Tree-sitter facts confirm the
+model's edges and backfill the ones it missed (tagged `facts:py_*`, `facts:java_*`, `facts:js_*`);
+VB.NET, C# and T-SQL get the same from the optional .NET parser. Other source files are still paged
+and read by the extraction passes, and the coverage report lists them as not structurally parsed.
+
 More detail: [docs/RUN_GUIDE.md](docs/RUN_GUIDE.md) (inputs, steps, outputs),
 [docs/RUNBOOK.md](docs/RUNBOOK.md) (every knob, checkpoints, exit codes),
 [docs/LAUNCHER_API.md](docs/LAUNCHER_API.md) (local launcher API),

@@ -82,8 +82,13 @@ Roslyn-shaped skeleton when there is no .NET tool (`facts_status.json`: `"reason
 plus `"dotnet_skipped"`). A corpus with none of those files behaves exactly as before.
 `DISTILL_FACTS_TREESITTER=0` turns the Tree-sitter half off. The sections use the Roslyn keys
 (`types`, `methods`, `calls`, `inline_sql`) plus `imports` and `call_sites`, so
-`code_graph.FactsIndex` confirms and backfills Python edges (tagged `facts:py_call`,
-`facts:py_import_external`, `facts:py_inline_sql`, ...) with no per-language branch. Call
+`code_graph.FactsIndex` confirms and backfills Python, Java and JavaScript/TypeScript edges
+(tagged `facts:py_call`, `facts:py_import_external`, `facts:py_inline_sql`, and in the same way
+`facts:java_call`, `facts:java_import_external`, `facts:java_inline_sql`, `facts:js_call`,
+`facts:js_import_external`, `facts:js_inline_sql`, ...; `_stdlib` marks `java.*`/`javax.*` and Node
+built-ins) with no per-language branch. A JS/TS symbol id is `<module path>:<Class.name>`, and it is
+matched on the part after the colon. A Java `import a.b.C;` that the model reports confirms the
+parser's `a.b` import instead of adding a second edge. Call
 resolution is syntactic: a call through a receiver whose type is not visible in the file (a
 return value, a dict entry, duck typing) stays an unresolved `call_sites` entry, never a guessed edge.
 
