@@ -316,3 +316,48 @@ def test_build_code_graph_persists_java_and_ts_relations(tmp_path, monkeypatch, 
     assert (CART, "axios", "IMPORTS", "facts:js_import_external") in edges
     assert any(s == JSVC and t == "CALLS" and sym == "facts:java_call" for s, _, t, sym in edges)
     assert {"invoiceservice", "baseservice.audit", "cartservice", "cartservice.checkout"} <= objs
+
+
+def test_cut_off_reply_is_retried_with_a_larger_budget(monkeypatch):
+    import code_graph as cg
+    import bedrock_client
+    budgets = []
+
+    class R:
+        def __init__(self, text):
+            self.output_text, self.input_tokens, self.output_tokens, self.stop_reason = text, 1, 1, "end_turn"
+
+    def fake(llm, model, system, user, max_tokens, temperature):
+        budgets.append(max_tokens)
+        return R('{"defines": [], "edges": [ {"type": "CALLS", "dst": "a.b"')  if len(budgets) == 1 \
+            else R('{"defines": [], "edges": []}')
+    monkeypatch.setattr(bedrock_client, "call_llm", fake)
+    node, meta = cg._extract_one(object(), "m", "src/Big.java", "java", "class Big {}", "page_000")
+    assert budgets == list(cg.OUTPUT_BUDGETS) and "error" not in node and meta["in"] == 2
+
+
+def test_reply_that_never_parses_reports_an_error(monkeypatch):
+    import code_graph as cg
+    import bedrock_client
+
+    class R:
+        output_text, input_tokens, output_tokens, stop_reason = "not json", 1, 1, "end_turn"
+    monkeypatch.setattr(bedrock_client, "call_llm", lambda *a, **k: R())
+    node, _ = cg._extract_one(object(), "m", "src/Big.java", "java", "class Big {}", "page_000")
+    assert node["error"].startswith("parse:")
+
+
+def test_persist_replaces_a_files_rows_on_rerun(tmp_path):
+    import sqlite3
+    import code_graph as cg
+    conn = sqlite3.connect(tmp_path / "v.db")
+    cg.ensure_tables(conn)
+    node = {"path": "src/A.java", "lang": "java", "role": "service", "role_confirmed": True,
+            "module": "m", "unverified_tag": None, "module_validated": True, "business_intent": "",
+            "prov": {"page": "page_000", "model": "m", "extracted_at": "t"},
+            "defines": [{"name": "A", "kind": "class"}], "business_entities": [],
+            "edges": [{"src": "src/A.java", "dst": "b", "type": "CALLS", "lang": "java"}]}
+    cg._persist(conn, node)
+    cg._persist(conn, node)
+    assert conn.execute("SELECT COUNT(*) FROM code_edges").fetchone()[0] == 1
+    assert conn.execute("SELECT COUNT(*) FROM code_objects").fetchone()[0] == 1

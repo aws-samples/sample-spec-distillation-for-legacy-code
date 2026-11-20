@@ -1403,32 +1403,52 @@ def _assemble(path, lang, llm, body, page, model_id, facts: "FactsIndex | None" 
     return node
 
 
-def _extract_one(llm, model_id, path, lang, body, page, facts: "FactsIndex | None" = None):
-    system, tmpl = _LANG_PROMPTS.get(lang, (CS_SYSTEM, CS_USER))  # unknown lang → C#-shape default
-    user = tmpl.format(path=path, source=body)
+# Output budgets per file: most files fit the first; a large file with many calls (a 680-line
+# Java service) can need more, and a cut-off reply is unparseable JSON. So a reply that stopped at
+# the limit, or does not parse, is retried once with the larger budget.
+OUTPUT_BUDGETS = (8192, 32768)
+
+
+def _call_with_retries(llm, model_id, system, user, max_tokens):
     res, last = None, None
     for attempt in range(4):
         try:
             res = bedrock_client.call_llm(llm, model_id, system, user,
-                                             max_tokens=8192, temperature=0.0)
+                                             max_tokens=max_tokens, temperature=0.0)
             break
         except Exception as exc:
             last = exc
             time.sleep(2 * (attempt + 1))
-    if res is None:
-        return {"path": path, "lang": lang, "error": str(last)}, {"in": 0, "out": 0}
-    meta = {"in": res.input_tokens, "out": res.output_tokens}
-    try:
-        llm = json.loads(_strip_json(res.output_text))
-    except Exception as exc:
-        return {"path": path, "lang": lang, "error": f"parse: {exc}"}, meta
-    return _assemble(path, lang, llm, body, page, model_id, facts), meta
+    return res, last
+
+
+def _extract_one(llm, model_id, path, lang, body, page, facts: "FactsIndex | None" = None):
+    system, tmpl = _LANG_PROMPTS.get(lang, (CS_SYSTEM, CS_USER))  # unknown lang → C#-shape default
+    user = tmpl.format(path=path, source=body)
+    meta = {"in": 0, "out": 0}
+    for i, budget in enumerate(OUTPUT_BUDGETS):
+        res, last = _call_with_retries(llm, model_id, system, user, budget)
+        if res is None:
+            return {"path": path, "lang": lang, "error": str(last)}, meta
+        meta = {"in": meta["in"] + res.input_tokens, "out": meta["out"] + res.output_tokens}
+        try:
+            parsed = json.loads(_strip_json(res.output_text))
+        except Exception as exc:
+            if i + 1 < len(OUTPUT_BUDGETS):
+                continue                            # cut off or malformed: retry with more room
+            return {"path": path, "lang": lang, "error": f"parse: {exc}"}, meta
+        return _assemble(path, lang, parsed, body, page, model_id, facts), meta
 
 
 # ── Persistence ──────────────────────────────────────────────────────────────
 
 def _persist(conn: sqlite3.Connection, node: dict) -> None:
     p = node["path"]
+    # Replace, don't append: a re-run of this stage on an existing run must not duplicate a file's
+    # edges, objects or entities.
+    conn.execute("DELETE FROM code_edges WHERE src=?", (p,))
+    conn.execute("DELETE FROM code_objects WHERE path=?", (p,))
+    conn.execute("DELETE FROM code_entities WHERE path=?", (p,))
     conn.execute(
         "INSERT OR REPLACE INTO source_files "
         "(path,lang,role,role_confirmed,module,unverified_tag,module_validated,business_intent,page,model,extracted_at) "
